@@ -9,22 +9,24 @@ app = flask.Flask(__name__)
 with open('static/token', encoding='UTF-8') as f:
     token = f.read()
 
+
 @app.route('/register', methods=['POST'])
 def register():
-    "Контроллер регистрации новых пользователей"
+    """Контроллер регистрации новых пользователей"""
     content = flask.request.get_json()
 
     if not tools.validate_reg_request(content):
         return "BAD request", 400
     if content['token'] != token:
         return "Invalid token", 403
-   
+
     file_engine.register(content['user'], content['channel'])
     return "OK", 200
 
+
 @app.route('/predict', methods=['POST'])
 def predict():
-    "Контроллер оценки полезности"
+    """Контроллер оценки полезности"""
     content = flask.request.get_json()
 
     if not tools.validate_pred_request(content):
@@ -39,11 +41,12 @@ def predict():
         utility.append(file_engine.predict(content['user'], content['channel'], p_text))
     return flask.jsonify(**{'utility': utility}), 200
 
+
 @app.route('/fit', methods=['POST'])
 def fit():
-    "Контроллер обучения пар пользователь:канал"
+    """Контроллер обучения пар пользователь:канал"""
     content = flask.request.get_json()
- 
+
     if not tools.validate_fit_request(content):
         return "BAD request", 400
 
@@ -52,6 +55,7 @@ def fit():
         p_text.append(bert_engine.extract(text))
     file_engine.async_fit(content['user'], content['channel'], p_text, content['labels'])
     return "OK", 200
- 
+
+
 if __name__ == '__main__':
     app.run(debug=True)
