@@ -39,6 +39,7 @@ def predict():
         # hash = hashlib.md5(text.encode('utf-8')).hexdigest() # На случай подключения Redis
         p_text = bert_engine.extract(text)
         utility.append(file_engine.predict(content['user'], content['channel'], p_text))
+
     return flask.jsonify(**{'utility': utility}), 200
 
 
@@ -49,10 +50,13 @@ def fit():
 
     if not tools.validate_fit_request(content):
         return "BAD request", 400
+    if content['token'] != token:
+        return "Invalid token", 403
 
     p_text = []
     for text in content['text']:
         p_text.append(bert_engine.extract(text))
+
     file_engine.async_fit(content['user'], content['channel'], p_text, content['labels'])
     return "OK", 200
 

@@ -1,30 +1,25 @@
 """Модуль для поддержки Bert"""
 import copy
 import threading
-import time  # Выключить после тестов
 import functools
-import transformers
-import numpy as np  # Выключить после тестов
-
-cache_size = 100  # Изменить в соответствии с объемом ОЗУ
+from transformers import AutoTokenizer, AutoModel, BertModel
+import settings
+from torch.nn.functional import normalize
 
 lock = threading.RLock()
 
-tokenizer = transformers.DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
-model = transformers.DistilBertModel.from_pretrained("distilbert-base-uncased")
+model = AutoModel.from_pretrained(settings.MODEL)
+tokenizer = AutoTokenizer.from_pretrained(settings.MODEL)
 
 
-@functools.lru_cache(maxsize=cache_size)
+@functools.lru_cache(maxsize=settings.CASH_SIZE)
 def extract(text):
     """Извлекает признаки из текста """
     with lock:
-        # inputs = tokenizer(text, return_tensors="pt")
-        # return model(**inputs).last_hidden_state.detach().numpy()
-        time.sleep(3)  # Имитация работы BERTа
-        return np.array([int.from_bytes(text.encode(), 'big')])  # Для тестов
+        return normalize(model.forward(**tokenizer([text], return_tensors="pt"))['last_hidden_state'][:, 0, :], dim=0)
 
 
-def turbo_extract(text):  # Не включать!!! Крайне опасно
+def turbo_extract(text):
     """Экспериментальная функция!!! Параллельное извлечение признаков на CPU"""
     turbo_tokenizer = copy.deepcopy(tokenizer)
     turbo_model = copy.deepcopy(model)
