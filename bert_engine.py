@@ -2,6 +2,8 @@
 import copy
 import threading
 import functools
+
+import torch
 from transformers import AutoTokenizer, AutoModel, BertModel
 import settings
 from torch.nn.functional import normalize
@@ -16,7 +18,7 @@ tokenizer = AutoTokenizer.from_pretrained(settings.MODEL)
 def extract(text):
     """Извлекает признаки из текста """
     with lock:
-        return normalize(model.forward(**tokenizer([text], return_tensors="pt"))['last_hidden_state'][:, 0, :], dim=0)
+        return torch.squeeze(normalize(model.forward(**tokenizer([text], return_tensors="pt"))['last_hidden_state'][:, 0, :], dim=0).detach())
 
 
 def turbo_extract(text):

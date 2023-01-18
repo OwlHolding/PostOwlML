@@ -24,11 +24,7 @@ def predict(user, channel, p_text):
 
         positive = torch.load(f'users/{user}/{channel}/positive.pt')
 
-    result = []
-    for text in p_text:
-        # взятие косинусной близости и перевод в интервал [0, 1]
-        result.append((cosine_similarity(p_text, positive).item() + 1) / 2)
-    return result
+    return (cosine_similarity(p_text, positive, dim=0).item() + 1) / 2
 
 
 def async_fit(user, channel, data, labels):
@@ -39,14 +35,22 @@ def async_fit(user, channel, data, labels):
 
 def fit(user, channel, data, labels, lock):
     """Обучает и сохраняет модель"""
-    with lock:
-        if not os.path.exists(f'users/{user}/{channel}.npy'):
-            register(user, channel)
-        positive = torch.load(f'users/{user}/{channel}/positive.pt')
-        negative = torch.load(f'users/{user}/{channel}/negative.pt')
+    # with lock:
+    #     if not os.path.exists(f'users/{user}/{channel}.npy'):
+    #         register(user, channel)
+    #     positive = torch.load(f'users/{user}/{channel}/positive.pt')
+    #     negative = torch.load(f'users/{user}/{channel}/negative.pt')
 
-    positive = torch.rand([768])  # функции заглушки
-    negative = torch.rand([768])
+    positive = []
+    negative = []
+    for i, element in enumerate(data):
+        if labels[i] == 1:
+            positive.append(element)
+        else:
+            negative.append(element)
+
+    positive = torch.stack(positive).mean(0)
+    negative = torch.stack(negative).mean(0)
 
     with lock:
         torch.save(positive, f'users/{user}/{channel}/positive.pt')
