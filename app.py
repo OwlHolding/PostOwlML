@@ -28,7 +28,7 @@ async def create_model(user_id: int, request: ChannelRequest) -> Response:
         return Response('User Not Found', status_code=404)
 
     content = {
-        'posts': get_posts(request.channel, 10, None)
+        'posts': await get_posts(request.channel, 10, None)
     }
 
     return JSONResponse(
@@ -44,16 +44,10 @@ async def train(user_id: int, request: TrainRequest) -> Response:
     if not valid_channel(user_id, request.channel):
         return Response('User Not Found', status_code=404)
 
-    dataset = {
-        "text": request.posts,
-        "label": request.labels
-    }
-
     ml.fit(
-        dataset,
-        all_texts=request.posts,
-        path_model=f"users/{user_id}/{request.channel}/model.pk",
-        path_tfidf=f"users/{user_id}/{request.channel}/tfidf.pk"
+        texts=request.posts,
+        labels=request.labels,
+        path=f"users/{user_id}/{request.channel}"
     )
 
     return Response(status_code=202)
@@ -66,17 +60,17 @@ async def predict(user_id: int, request: PredictRequest) -> Response:
     if not valid_channel(user_id, request.channel):
         return Response('User Not Found', status_code=404)
 
-    posts = get_posts(request.channel, 10, request.time)
+    posts = await get_posts(request.channel, request.count, request.time)
 
     output = ml.predict(
         posts,
-        path_model=f"users/{user_id}/{request.channel}/model.pk",
-        path_tfidf=f"users/{user_id}/{request.channel}/tfidf.pk"
+        path=f"users/{user_id}/{request.channel}",
     )
-    content = {
-        "utility": output.tolist()
-    }
 
+    content = {
+        "posts": sorted(posts, key=lambda x: output[posts.index(x)][1])
+
+    }
     return JSONResponse(
         content=content,
         status_code=200

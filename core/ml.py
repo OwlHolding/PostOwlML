@@ -8,8 +8,9 @@ from pymystem3 import Mystem
 import re
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.svm import SVC
-import pickle
 from multiprocessing import RLock
+
+from core.files import save_model, load_model
 
 lock = RLock()
 
@@ -31,43 +32,49 @@ class KeyWords:
             self.stem = SnowballStemmer(language='english')
             self.stop_words += ['i']
 
-    def remove_urls(self, documents) -> list:
+    @staticmethod
+    def remove_urls(documents: list) -> list:
         return [re.sub('https?:\/\/.*?[\s+]', '', text) for text in documents]
 
-    def replace_newline(self, documents):
+    @staticmethod
+    def replace_newline(documents: list) -> list:
         documents = [text.replace('\n', ' ') + ' ' for text in documents]
         return documents
 
-    def remove_strange_symbols(self, documents):
+    @staticmethod
+    def remove_strange_symbols(documents: list) -> list:
         return [re.sub(f'[^A-Za-zА-Яа-яё0-9{string.punctuation}\ ]+', ' ', text) for text in documents]
 
-    def tokenize(self, documents) -> list:
+    def tokenize(self, documents: list) -> list:
         if self.lang == 'english':
             return [nltk.word_tokenize(text) for text in documents]
         else:
             return [[token.text for token in razdel.tokenize(text)] for text in documents]
 
-    def to_lower(self, documents) -> list:
+    @staticmethod
+    def to_lower(documents: list) -> list:
         return [text.lower() for text in documents]
 
-    def remove_punctuation(self, tokenized_documents):
+    @staticmethod
+    def remove_punctuation(tokenized_documents) -> list:
         ttt = set(string.punctuation)
         return [[token for token in tokenized_text if not set(token) < ttt] for tokenized_text in tokenized_documents]
 
-    def remove_numbers(self, documents):
+    @staticmethod
+    def remove_numbers(documents: list) -> list:
         return [re.sub('(?!:\s)\d\.?\d*', ' ', text) for text in documents]
 
     def remove_stop_words(self, tokenized_documents) -> list:
         return [[token for token in tokenized_text if token not in self.stop_words] for tokenized_text in
                 tokenized_documents]
 
-    def lemmatize(self, documents) -> list:
+    def lemmatize(self, documents: list) -> list:
         if self.lang == 'russian':
             return [''.join(self.stem.lemmatize(text)) for text in documents]
         else:
             return [' '.join(self.stem.stem(token) for token in text.split()) for text in documents]
 
-    def preprocessing(self, documents):
+    def preprocessing(self, documents: list) -> list:
         documents = self.replace_newline(documents)
         documents = self.remove_urls(documents)
         documents = self.remove_strange_symbols(documents)
@@ -80,7 +87,7 @@ class KeyWords:
         documents = [' '.join(tokenized_text) for tokenized_text in tokenized_documents]
         return documents
 
-    def get_tfifd(self, documents):
+    def get_tfifd(self, documents: list) -> TfidfVectorizer:
         clean_documents = self.preprocessing(documents)
 
         tf_idf_vectorizer = TfidfVectorizer()
@@ -89,25 +96,18 @@ class KeyWords:
         return tf_idf_vectorizer
 
 
-def fit(dataset, all_texts, path_model, path_tfidf, language='russian'):
+def fit(texts: list[str], labels: list[int], path: str, language='russian') -> None:
+
     feature_extractor = KeyWords(language)
-    tfidf = feature_extractor.get_tfifd(all_texts)
+    tfidf = feature_extractor.get_tfifd(texts)
     model = SVC(probability=True)
-    model.fit(tfidf.transform(feature_extractor.preprocessing(dataset['text'])).toarray(), dataset['label'])
-    with lock:
-        with open(path_model, 'wb') as f:
-            pickle.dump(model, f)
-        with open(path_tfidf, 'wb') as f:
-            pickle.dump(tfidf, f)
+    model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
+    save_model(path, model, tfidf)
 
 
-def predict(X, path_model, path_tfidf, language='russian'):
+def predict(texts: list[str], path: str, language='russian') -> list:
     feature_extractor = KeyWords(language)
 
-    with lock:
-        with open(path_model, 'rb') as f:
-            model = pickle.load(f)
-        with open(path_tfidf, 'rb') as f:
-            tfidf = pickle.load(f)
+    model, tfidf = load_model(path)
 
-    return model.predict_proba(tfidf.transform(feature_extractor.preprocessing(X)).toarray())
+    return model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()

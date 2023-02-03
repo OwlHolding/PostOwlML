@@ -1,6 +1,7 @@
 """Модуль управления файлами для пар пользователь:канал"""
 import os
 import multiprocessing
+import pickle
 
 lock = multiprocessing.RLock()
 
@@ -25,3 +26,23 @@ def register_user(user_id: [int, str]) -> int:
         return 200
 
     return 208
+
+
+def save_model(path: str, model, tfidf):
+    """Сохраняет модель и tfidf"""
+    with lock:
+        with open(path + "/model.pk", 'wb') as f:
+            pickle.dump(model, f)
+        with open(path + "/tfidf.pk", 'wb') as f:
+            pickle.dump(tfidf, f)
+
+
+def load_model(path: str):
+    """Загружает модель и tfidf"""
+    with lock:
+        with open(path + "/model.pk", 'rb') as f:
+            model = pickle.load(f)
+        with open(path + "/tfidf.pk", 'rb') as f:
+            tfidf = pickle.load(f)
+
+    return model, tfidf
