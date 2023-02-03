@@ -1,65 +1,83 @@
-import flask
-import tools
-import file_engine
-import bert_engine
-import hashlib
+from fastapi import FastAPI, Response
+from fastapi.responses import JSONResponse
 
-app = flask.Flask(__name__)
+from core import files
+from core.requests import *
+from core.telegram import get_posts
+from core.utils import valid_channel, valid_user
+from core import ml
 
-with open('static/token', encoding='UTF-8') as f:
-    token = f.read()
-
-
-@app.route('/register', methods=['POST'])
-def register():
-    """Контроллер регистрации новых пользователей"""
-    content = flask.request.get_json()
-
-    if not tools.validate_reg_request(content):
-        return "BAD request", 400
-    if content['token'] != token:
-        return "Invalid token", 403
-
-    file_engine.register(content['user'], content['channel'])
-    return "OK", 200
+app = FastAPI()
 
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    """Контроллер оценки полезности"""
-    content = flask.request.get_json()
+@app.post('/register/{user_id}/')
+async def register(user_id: int) -> Response:
+    """Регистрация новых пользователей"""
 
-    if not tools.validate_pred_request(content):
-        return "BAD request", 400
-    if content['token'] != token:
-        return "Invalid token", 403
-
-    utility = []
-    for text in content['text']:
-        # hash = hashlib.md5(text.encode('utf-8')).hexdigest() # На случай подключения Redis
-        p_text = bert_engine.extract(text)
-        utility.append(file_engine.predict(content['user'], content['channel'], p_text))
-
-    return flask.jsonify(**{'utility': utility}), 200
+    return Response(
+        content="",
+        status_code=files.register_user(user_id)
+    )
 
 
-@app.route('/fit', methods=['POST'])
-def fit():
-    """Контроллер обучения пар пользователь:канал"""
-    content = flask.request.get_json()
+@app.post('/train/{user_id}/')
+async def create_model(user_id: int, request: ChannelRequest) -> Response:
+    """Создание модели и обучающей выборки для запрошенного канала."""
 
-    if not tools.validate_fit_request(content):
-        return "BAD request", 400
-    if content['token'] != token:
-        return "Invalid token", 403
+    if not valid_user(user_id):
+        return Response('User Not Found', status_code=404)
 
-    p_text = []
-    for text in content['text']:
-        p_text.append(bert_engine.extract(text))
+    content = {
+        'posts': get_posts(request.channel, 10, None)
+    }
 
-    file_engine.async_fit(content['user'], content['channel'], p_text, content['labels'])
-    return "OK", 200
+    return JSONResponse(
+        content=content,
+        status_code=files.register_channel(user_id, request.channel)
+    )
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.put('/train/{user_id}/')
+async def train(user_id: int, request: TrainRequest) -> Response:
+    """Обучение модели"""
+
+    if not valid_channel(user_id, request.channel):
+        return Response('User Not Found', status_code=404)
+
+    dataset = {
+        "text": request.posts,
+        "label": request.labels
+    }
+
+    ml.fit(
+        dataset,
+        all_texts=request.posts,
+        path_model=f"users/{user_id}/{request.channel}/model.pk",
+        path_tfidf=f"users/{user_id}/{request.channel}/tfidf.pk"
+    )
+
+    return Response(status_code=202)
+
+
+@app.post('/predict/{user_id}/')
+async def predict(user_id: int, request: PredictRequest) -> Response:
+    """Выбор лучших постов"""
+
+    if not valid_channel(user_id, request.channel):
+        return Response('User Not Found', status_code=404)
+
+    posts = get_posts(request.channel, 10, request.time)
+
+    output = ml.predict(
+        posts,
+        path_model=f"users/{user_id}/{request.channel}/model.pk",
+        path_tfidf=f"users/{user_id}/{request.channel}/tfidf.pk"
+    )
+    content = {
+        "utility": output.tolist()
+    }
+
+    return JSONResponse(
+        content=content,
+        status_code=200
+    )
