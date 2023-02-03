@@ -8,14 +8,14 @@
 
 ### Ответ успешно
 
-```json
+```
 Created 201
 Already Reported 208
 ```
 
 ### Ответ ошибка
 
-```json
+```
 Internal Server Error 500
 ```
 
@@ -35,7 +35,7 @@ Internal Server Error 500
 
 ### Ответ успешно
 
-```json
+```
 Created 201
 Already Reported 208
 ```
@@ -51,19 +51,19 @@ Already Reported 208
 
 ### Ответ ошибка
 
-```json
+```
 Internal Server Error 500
 ```
 
-```json
+```
 User Not Found 404
 ```
 
-```json
+```
 Channel Not Exists 400
 ```
 
-```json
+```
 Bad Request 400
 ```
 
@@ -90,27 +90,27 @@ Bad Request 400
 
 ### Ответ успешно
 
-```json
+```
 Accepted 202 
 ```
 
 ### Ответ ошибка
 
-```json
+```
 Internal Server Error 500
 ```
 
-```json
+```
 User Not Found 404
 ```
 
-```json
+```
 Bad Request 400
 ```
 
 ## Выбор лучших постов
 
-### GET <https://$url/predict/$id>
+### POST <https://$url/predict/$id>
 
 Выбрать *count* лучших постов с канала до *time* (минут) вчерашнего дня и прислать в порядке убывания полезности.
 
@@ -126,7 +126,7 @@ Bad Request 400
 
 ### Ответ успешно
 
-```json
+```
 OK 200
 ```
 
@@ -141,18 +141,18 @@ OK 200
 
 ### Ответ ошибка
 
-```json
+```
 Internal Server Error 500
 ```
 
-```json
+```
 User Not Found 404
 ```
 
-```json
+```
 Channel Not Found 404
 ```
 
-```json
+```
 Bad Request 400
 ```
