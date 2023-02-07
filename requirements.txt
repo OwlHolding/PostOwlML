@@ -35,5 +35,5 @@ watchfiles==0.18.1
 websockets==10.4
 Werkzeug==2.2.2
 zipp==3.11.0
-
+scikit-learn~=1.2.1
 pymystem3~=0.2.0
