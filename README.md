@@ -21,7 +21,7 @@ Internal Server Error 500
 
 ## Регистрация нового канала
 
-### POST <https://$url/train/$id>
+### POST <https://$url/regchannel/$id>
 
 Создать модель и обучающую выборку для запрошенного канала.
 
@@ -69,7 +69,7 @@ Bad Request 400
 
 ## Тренировка модели
 
-### PUT <https://$url/train/$id>
+### POST <https://$url/train/$id>
 
 Запустить тренировку модели.
 

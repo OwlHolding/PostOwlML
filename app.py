@@ -20,7 +20,7 @@ async def register(user_id: int) -> Response:
     )
 
 
-@app.post('/train/{user_id}/')
+@app.post('/regchannel/{user_id}/')
 async def create_model(user_id: int, request: ChannelRequest) -> Response:
     """Создание модели и обучающей выборки для запрошенного канала."""
 
@@ -37,7 +37,7 @@ async def create_model(user_id: int, request: ChannelRequest) -> Response:
     )
 
 
-@app.put('/train/{user_id}/')
+@app.post('/train/{user_id}/')
 async def train(user_id: int, request: TrainRequest) -> Response:
     """Обучение модели"""
 
