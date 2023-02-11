@@ -21,17 +21,9 @@ Internal Server Error 500
 
 ## Регистрация нового канала
 
-### POST <https://$url/regchannel/$id>
+### POST <https://$url/regchannel/$id/$channel/>
 
 Создать модель и обучающую выборку для запрошенного канала.
-
-### Запрос
-
-```json
-{
-    "channel": "forbesrussia"
-}
-```
 
 ### Ответ успешно
 
@@ -64,12 +56,12 @@ Channel Not Exists 400
 ```
 
 ```
-Bad Request 400
+Bad Request 422
 ```
 
 ## Тренировка модели
 
-### POST <https://$url/train/$id>
+### POST <https://$url/train/$id/$channel/>
 
 Запустить тренировку модели.
 
@@ -82,9 +74,7 @@ Bad Request 400
         "Евро упал до земли"
     ],
 
-    "labels": [1, 0],
-  
-    "channel": "forbesrussia"
+    "labels": [1, 0]
 }
 ```
 
@@ -105,12 +95,16 @@ User Not Found 404
 ```
 
 ```
-Bad Request 400
+Bad Request 422
+```
+
+```
+Length Required 411
 ```
 
 ## Выбор лучших постов
 
-### POST <https://$url/predict/$id>
+### POST <https://$url/predict/$id/$channel/>
 
 Выбрать *count* лучших постов с канала до *time* (минут) вчерашнего дня и прислать в порядке убывания полезности.
 
@@ -118,9 +112,7 @@ Bad Request 400
 
 ```json
 {
-    "channel": "forbesrussia",
     "time": 720,
-    "count": 2
 }
 ```
 
@@ -135,7 +127,7 @@ OK 200
     "posts": [
         "Доллар взлетел до небес",
         "Евро упал до земли"
-    ],
+    ]
 }
 ```
 
@@ -150,9 +142,9 @@ User Not Found 404
 ```
 
 ```
-Channel Not Found 404
+Channel Not Found 400
 ```
 
 ```
-Bad Request 400
+Bad Request 422
 ```

@@ -3,8 +3,10 @@ from datetime import datetime
 import json
 
 
-async def get_posts(channel: str, count: int, times: [int, None]) -> list[str]:
+async def get_posts(channel: str, count: int, times: int) -> [list[str], int]:
     """Запрос постов с телеграмм канала"""
+
+    time_point = datetime(datetime.now().year, datetime.now().month, datetime.now().day, times // 60, times % 60, 0)
 
     url = "https://telegram92.p.rapidapi.com/api/history/channel"
 
@@ -17,17 +19,19 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> list[str]:
 
     response = requests.request("GET", url, headers=headers, params=querystring)
 
+    if 'error' in response.text:
+        return [], 400
+
     response = json.loads(response.text)['messages']
 
     posts = []
 
     if times:
         for post in response:
-            t = datetime.utcfromtimestamp(post['date'])
-            if t.hour * t.minute * t.second > times:
+            if datetime.utcfromtimestamp(post['date']) > time_point:
                 posts.append(post['text'])
     else:
         for post in response:
             posts.append(post['text'])
 
-    return posts
+    return posts, 201

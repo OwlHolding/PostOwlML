@@ -14,63 +14,91 @@ app = FastAPI()
 async def register(user_id: int) -> Response:
     """Регистрация новых пользователей"""
 
+    status_code = 201 + (files.register_user(user_id) * 7)
+
     return Response(
         content="",
-        status_code=files.register_user(user_id)
+        status_code=status_code
     )
 
 
-@app.post('/regchannel/{user_id}/')
-async def create_model(user_id: int, request: ChannelRequest) -> Response:
+@app.post('/regchannel/{user_id}/{channel}/')
+async def create_model(user_id: int, channel: str) -> Response:
     """Создание модели и обучающей выборки для запрошенного канала."""
 
     if not valid_user(user_id):
         return Response('User Not Found', status_code=404)
 
+    posts, status_code = await get_posts(channel, 10, 0)
+
+    if status_code == 400:
+        return Response('Channel Not Exists', status_code=status_code)
+
+    status_code = 201 + (files.register_channel(user_id, channel) * 7)
+
     content = {
-        'posts': await get_posts(request.channel, 10, None)
+        'posts': posts
     }
 
     return JSONResponse(
         content=content,
-        status_code=files.register_channel(user_id, request.channel)
+        status_code=status_code
     )
 
 
-@app.post('/train/{user_id}/')
-async def train(user_id: int, request: TrainRequest) -> Response:
+@app.post('/train/{user_id}/{channel}/')
+async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     """Обучение модели"""
 
-    if not valid_channel(user_id, request.channel):
+    if not valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
 
-    ml.fit(
+    if len(request.posts) == 1 or len(request.posts) == 0:
+        return Response('Length Required', status_code=411)
+
+    await ml.fit(
         texts=request.posts,
         labels=request.labels,
-        path=f"users/{user_id}/{request.channel}"
+        path=f"users/{user_id}/{channel}"
     )
 
     return Response(status_code=202)
 
 
-@app.post('/predict/{user_id}/')
-async def predict(user_id: int, request: PredictRequest) -> Response:
+@app.post('/predict/{user_id}/{channel}/')
+async def predict(user_id: int, channel: str, request: PredictRequest) -> Response:
     """Выбор лучших постов"""
 
-    if not valid_channel(user_id, request.channel):
+    if not valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
 
-    posts = await get_posts(request.channel, request.count, request.time)
+    posts, status_code = await get_posts(channel, 50, request.time)
+
+    if status_code == 400:
+        return Response('Channel Not Exists', status_code=status_code)
+
+    if len(posts) == 0:
+        return JSONResponse(
+            content={
+                'posts': []
+            },
+            status_code=200
+        )
 
     output = ml.predict(
         posts,
-        path=f"users/{user_id}/{request.channel}",
+        path=f"users/{user_id}/{channel}",
     )
 
-    content = {
-        "posts": sorted(posts, key=lambda x: output[posts.index(x)][1])
+    response = []
+    for i in range(len(posts)):
+        if output[i] == 1:
+            response.append(posts[i])
 
+    content = {
+        "posts": response
     }
+
     return JSONResponse(
         content=content,
         status_code=200

@@ -96,7 +96,7 @@ class KeyWords:
         return tf_idf_vectorizer
 
 
-def fit(texts: list[str], labels: list[int], path: str, language='russian') -> None:
+async def fit(texts: list[str], labels: list[int], path: str, language='russian') -> None:
 
     feature_extractor = KeyWords(language)
     tfidf = feature_extractor.get_tfifd(texts)
@@ -110,4 +110,4 @@ def predict(texts: list[str], path: str, language='russian') -> list:
 
     model, tfidf = load_model(path)
 
-    return model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
+    return model.predict(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
