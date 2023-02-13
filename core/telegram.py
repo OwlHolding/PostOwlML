@@ -27,11 +27,21 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
     if times:
         time_point = datetime(datetime.now().year, datetime.now().month, datetime.now().day, times // 60, times % 60,
                               0) - timedelta(hours=24)
-        for post in response:
-            if datetime.utcfromtimestamp(post['date']) > time_point:
-                posts.append(post['text'])
+        if type(response) == list:
+            for post in response:
+                if datetime.utcfromtimestamp(post['date']) > time_point:
+                    posts.append(post['text'])
+        else:
+            for post in response.values():
+                if datetime.utcfromtimestamp(post['date']) > time_point and 'text' in post.keys():
+                    posts.append(post['text'])
     else:
-        for post in response:
-            posts.append(post['text'])
+        if type(response) == list:
+            for post in response:
+                posts.append(post['text'])
+        else:
+            for post in response.values():
+                if 'text' in post.keys():
+                    posts.append(post['text'])
 
     return posts, 201
