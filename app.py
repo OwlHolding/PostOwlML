@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 
+from threading import Thread
+
 from core import files
 from core.requests import *
 from core.telegram import get_posts
@@ -53,14 +55,33 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     if not valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
 
-    if len(request.posts) == 1 or len(request.posts) == 0:
-        return Response('Length Required', status_code=411)
+    if request.finetune:
+        df = files.load_dataset(user_id, channel)
+        config = files.load_config(user_id, channel)
+        df = df.append({'posts': request.posts[0], 'labels': request.labels[0], 'confidence': 0}, ignore_index=True)
 
-    await ml.fit(
-        texts=request.posts,
-        labels=request.labels,
-        path=f"users/{user_id}/{channel}"
-    )
+        if len(df) >= 7:
+            pass
+    else:
+
+        if len(request.posts) == 1 or len(request.posts) == 0:
+            return Response('Length Required', status_code=411)
+
+        # thread = Thread(target=ml.fit, kwargs={
+        #     "texts": request.posts,
+        #     "labels": request.labels,
+        #     "user_id": user_id,
+        #     "channel": channel,
+        # })
+        #
+        # thread.start()
+
+        await ml.fit(
+            texts=request.posts,
+            labels=request.labels,
+            user_id=user_id,
+            channel=channel,
+        )
 
     return Response(status_code=202)
 
@@ -86,8 +107,9 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         )
 
     output = ml.predict(
-        posts,
-        path=f"users/{user_id}/{channel}",
+        texts=posts,
+        user_id=user_id,
+        channel=channel,
     )
 
     response = []

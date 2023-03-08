@@ -8,11 +8,9 @@ from pymystem3 import Mystem
 import re
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.svm import SVC
-from multiprocessing import RLock
 
 from core.files import save_model, load_model
-
-lock = RLock()
+from core.telegram import get_posts
 
 warnings.filterwarnings("ignore")
 
@@ -96,18 +94,23 @@ class KeyWords:
         return tf_idf_vectorizer
 
 
-async def fit(texts: list[str], labels: list[int], path: str, language='russian') -> None:
+async def fit(texts: list[str], labels: list[int], user_id: [int, str], channel: str, language='russian') -> None:
 
     feature_extractor = KeyWords(language)
-    tfidf = feature_extractor.get_tfifd(texts)
+    posts, status_code = await get_posts(channel, 50, None)
+    tfidf = feature_extractor.get_tfifd(posts)
     model = SVC(probability=True)
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
-    save_model(path, model, tfidf)
+    save_model(user_id, channel, model, tfidf)
 
 
-def predict(texts: list[str], path: str, language='russian') -> list:
+def predict(texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:
     feature_extractor = KeyWords(language)
 
-    model, tfidf = load_model(path)
+    model, tfidf = load_model(user_id, channel)
 
     return model.predict(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
+
+
+def finetune(texts: list[str], labels: list[int], path: str, language='russian') -> None:
+    pass
