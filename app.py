@@ -73,15 +73,20 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     if request.finetune:
 
         if (len(dataset) - 10) % 7 == 0:
-            ml.finetune(config, user_id, channel, )
-
+            ml.finetune(config=config,
+                        user_id=user_id,
+                        channel=channel,
+                        texts_tf_idf=dataset['posts'].tolist(),
+                        labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
+                        texts=dataset[dataset['posts'].notna()]['posts'].tolist()
+                        )
+            if
     else:
-
         if len(request.posts) == 1 or len(request.posts) == 0:
             return Response('Length Required', status_code=411)
 
         # thread = Thread(target=ml.fit, kwargs={
-        #     "texts": request.posts,
+        #     "texts": request.posts
         #     "labels": request.labels,
         #     "user_id": user_id,
         #     "channel": channel,
@@ -147,6 +152,8 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
     if config['drop']:
         dataset = dataset.sort_values(by="timestamp").drop(index=0)
         print(dataset['timestamp'])
+    elif len(dataset) + 1 >= 1000:
+        config['drop'] = True
 
     files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': posts[-1],
                                                                            'labels': np.nan,

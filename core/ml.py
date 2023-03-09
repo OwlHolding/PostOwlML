@@ -11,7 +11,8 @@ import re
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.svm import SVC
 from catboost import CatBoostClassifier
-
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import f1_score
 from core.files import save_model, load_model
 from core.telegram import get_posts
 
@@ -130,7 +131,29 @@ def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, l
 def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: list[str], user_id: [int, str], channel: str, language='russian') -> None:
     feature_extractor = KeyWords(language)
     tfidf = feature_extractor.get_tfifd(texts_tf_idf)
+    X = tfidf.transform(feature_extractor.preprocessing(texts)).toarray()
+    if config['model'] != 'CatBoost':
+        X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.33, random_state=42)
+        model_1 = SVC(probability=True)
+        model_1.fit(X_train, y_train)
 
-    model = SVC(probability=True)
-    model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
+        model_2 = CatBoostClassifier()
+        model_2.fit(X_train, y_train)
+        svm_f1 = f1_score(y_test, model_1.predict(X_test))
+        cb_f1 = f1_score(y_test, model_1.predict(X_test))
+        print(f'Dataset size: {len(texts)}\n\tCatboost f1: {cb_f1}\n\tSVM f1: {svm_f1}')
+        if cb_f1 > svm_f1:
+            config['model'] = 'CatBoost'
+            model = CatBoostClassifier()
+            model.fit(X, labels)
+            save_model(user_id, channel, model, tfidf, config)
+        else:
+            model = SVC(probability=True)
+            model.fit(X, labels)
+            save_model(user_id, channel, model, tfidf, config)
+    else:
+        model = CatBoostClassifier()
+        model.fit(X, labels)
+        save_model(user_id, channel, model, tfidf, config)
+
 
