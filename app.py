@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
-
-from threading import Thread
+import numpy as np
+from datetime import datetime
+import pandas as pd
 
 from core import files
 from core.requests import *
@@ -31,7 +32,15 @@ async def create_model(user_id: int, channel: str) -> Response:
     if not valid_user(user_id):
         return Response('User Not Found', status_code=404)
 
-    posts, status_code = await get_posts(channel, 10, 0)
+    posts, status_code = await get_posts(channel, 50, 0)
+
+    df = files.load_dataset(user_id, channel)
+    files.save_dataset(user_id, channel, pd.concat([df, pd.DataFrame({'posts': posts,
+                                                                      'labels': [np.nan for _ in range(len(posts))],
+                                                                      'confidence': [np.nan for _ in range(len(posts))],
+                                                                      'timestamp': [datetime.now() for _ in
+                                                                                    range(len(posts))]
+                                                                      })]))
 
     if status_code == 400:
         return Response('Channel Not Exists', status_code=status_code)
@@ -39,7 +48,7 @@ async def create_model(user_id: int, channel: str) -> Response:
     status_code = 201 + (files.register_channel(user_id, channel) * 7)
 
     content = {
-        'posts': posts
+        'posts': posts[:10]
     }
 
     return JSONResponse(
@@ -55,13 +64,17 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     if not valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
 
-    if request.finetune:
-        df = files.load_dataset(user_id, channel)
-        config = files.load_config(user_id, channel)
-        df = df.append({'posts': request.posts[0], 'labels': request.labels[0], 'confidence': 0}, ignore_index=True)
+    dataset = files.load_dataset(user_id, channel)
+    config = files.load_config(user_id, channel)
 
-        if len(df) >= 7:
-            pass
+    for i in range(len(request.posts)):
+        dataset[dataset['posts'] == request.posts[i]]['labels'] = request.labels[i]
+
+    if request.finetune:
+
+        if (len(dataset) - 10) % 7 == 0:
+            ml.finetune(config, user_id, channel, )
+
     else:
 
         if len(request.posts) == 1 or len(request.posts) == 0:
@@ -77,11 +90,15 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
         # thread.start()
 
         await ml.fit(
+            config=config,
             texts=request.posts,
             labels=request.labels,
             user_id=user_id,
             channel=channel,
+            posts_tf_idf=dataset['posts'].tolist()
         )
+
+    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
 
     return Response(status_code=202)
 
@@ -95,18 +112,23 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     posts, status_code = await get_posts(channel, 50, request.time)
 
+    dataset = files.load_dataset(user_id, channel)
+    config = files.load_config(user_id, channel)
+
     if status_code == 400:
         return Response('Channel Not Exists', status_code=status_code)
 
     if len(posts) == 0:
         return JSONResponse(
             content={
-                'posts': []
+                'posts': [],
+                'markup': ""
             },
             status_code=200
         )
 
     output = ml.predict(
+        config=config,
         texts=posts,
         user_id=user_id,
         channel=channel,
@@ -118,8 +140,19 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             response.append(posts[i])
 
     content = {
-        "posts": response
+        "posts": response,
+        "markup": dataset[dataset.labels.isna()].sort_values(by="confidence")[0],
     }
+
+    if config['drop']:
+        dataset = dataset.sort_values(by="timestamp").drop(index=0)
+        print(dataset['timestamp'])
+
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': posts[-1],
+                                                                           'labels': np.nan,
+                                                                           'confidence': np.nan,
+                                                                           'timestamp': datetime.now()
+                                                                           })]))
 
     return JSONResponse(
         content=content,

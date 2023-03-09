@@ -1,5 +1,7 @@
 import nltk
 import string
+
+import pandas as pd
 import razdel
 import warnings
 from nltk.corpus import stopwords
@@ -8,6 +10,7 @@ from pymystem3 import Mystem
 import re
 from nltk.stem.snowball import SnowballStemmer
 from sklearn.svm import SVC
+from catboost import CatBoostClassifier
 
 from core.files import save_model, load_model
 from core.telegram import get_posts
@@ -94,23 +97,40 @@ class KeyWords:
         return tf_idf_vectorizer
 
 
-async def fit(texts: list[str], labels: list[int], user_id: [int, str], channel: str, language='russian') -> None:
-
+def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list[float]:
     feature_extractor = KeyWords(language)
-    posts, status_code = await get_posts(channel, 50, None)
-    tfidf = feature_extractor.get_tfifd(posts)
+
+    model, tfidf = load_model(user_id, channel, config)
+
+    return [abs(i - 0.5) for i in model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()]
+
+
+async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str, texts_tf_idf: list[str], language='russian') -> None:
+
+    # Создание и обучение TF-IDF на 50 постах с канала
+    feature_extractor = KeyWords(language)
+    tfidf = feature_extractor.get_tfifd(texts_tf_idf)
+
+    # Создание и обучение модели
     model = SVC(probability=True)
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
-    save_model(user_id, channel, model, tfidf)
+
+    # Сохранение модели
+    save_model(user_id, channel, model, tfidf, config)
 
 
-def predict(texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:
+def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:
     feature_extractor = KeyWords(language)
 
-    model, tfidf = load_model(user_id, channel)
+    model, tfidf = load_model(user_id, channel, config)
 
     return model.predict(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
 
-def finetune(texts: list[str], labels: list[int], path: str, language='russian') -> None:
-    pass
+def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: list[str], user_id: [int, str], channel: str, language='russian') -> None:
+    feature_extractor = KeyWords(language)
+    tfidf = feature_extractor.get_tfifd(texts_tf_idf)
+
+    model = SVC(probability=True)
+    model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
+

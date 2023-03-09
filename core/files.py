@@ -30,14 +30,13 @@ def register_channel(user_id: [int, str], channel: str) -> bool:
                 pass
             with open(f'users/{user_id}/{channel}/tfidf.pk', 'w') as f:
                 pass
-            dataset = pd.DataFrame(columns=['posts', 'labels', 'confidence']).reset_index()
-            dataset.to_feather(f'users/{user_id}/{channel}/dataset.feather')
+            dataset = pd.DataFrame(columns=['posts', 'labels', 'confidence', 'timestamp'])
+            save_dataset(user_id, channel, dataset)
             config = {
                 "model": "SVM",
+                "drop": False,
             }
-            with open(f'users/{user_id}/{channel}/config.json', 'w') as f:
-                json.dump(config, f)
-
+            save_config(user_id, channel, config)
             return False
 
         return True
@@ -53,7 +52,7 @@ def register_user(user_id: [int, str]) -> bool:
         return True
 
 
-def save_model(user_id: [int, str], channel: str, model, tfidf) -> None:
+def save_model(user_id: [int, str], channel: str, model, tfidf, config: dict) -> None:
     """Сохраняет модель и tfidf"""
     with locks[user_id]:
         with open(f'users/{user_id}/{channel}/model.pk', 'wb') as f:
@@ -62,7 +61,7 @@ def save_model(user_id: [int, str], channel: str, model, tfidf) -> None:
             pickle.dump(tfidf, f)
 
 
-def load_model(user_id: [int, str], channel: str):
+def load_model(user_id: [int, str], channel: str, config: dict):
     """Загружает модель и tfidf"""
     with locks[user_id]:
         with open(f'users/{user_id}/{channel}/model.pk', 'rb') as f:
