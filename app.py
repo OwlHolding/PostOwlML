@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 import numpy as np
 from datetime import datetime
 import pandas as pd
+import logging
 
 from core import files
 from core.requests import *
@@ -12,12 +13,17 @@ from core import ml
 
 app = FastAPI()
 
+logging.basicConfig(level=logging.DEBUG)
+
 
 @app.post('/register/{user_id}/')
 async def register(user_id: int) -> Response:
     """Регистрация новых пользователей"""
 
     status_code = 201 + (files.register_user(user_id) * 7)
+
+    if status_code == 201:
+        logging.info(f"Created new user {user_id}")
 
     return Response(
         content="",
@@ -33,6 +39,15 @@ async def create_model(user_id: int, channel: str) -> Response:
         return Response('User Not Found', status_code=404)
 
     posts, status_code = await get_posts(channel, 50, 0)
+    logging.debug(f"Successfully received {len(posts)} posts from the channel {channel}")
+
+    if status_code == 400:
+        return Response('Channel Not Exists', status_code=status_code)
+
+    status_code = 201 + (files.register_channel(user_id, channel) * 7)
+
+    if status_code == 201:
+        logging.info(f"Successfully registered a new channel for {user_id}:{channel}")
 
     df = files.load_dataset(user_id, channel)
     files.save_dataset(user_id, channel, pd.concat([df, pd.DataFrame({'posts': posts,
@@ -41,11 +56,7 @@ async def create_model(user_id: int, channel: str) -> Response:
                                                                       'timestamp': [datetime.now() for _ in
                                                                                     range(len(posts))]
                                                                       })]))
-
-    if status_code == 400:
-        return Response('Channel Not Exists', status_code=status_code)
-
-    status_code = 201 + (files.register_channel(user_id, channel) * 7)
+    logging.debug(f"The dataset for {user_id}:{channel} has been updated")
 
     content = {
         'posts': posts[:10]
@@ -68,11 +79,15 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     config = files.load_config(user_id, channel)
 
     for i in range(len(request.posts)):
-        dataset[dataset['posts'] == request.posts[i]]['labels'] = request.labels[i]
+        dataset.loc[dataset['posts'] == request.posts[i], 'labels'] = int(request.labels[i])
 
     if request.finetune:
 
+        logging.debug(f'Dataset Size for user {user_id}:{channel} is {len(dataset)}')
+
         if (len(dataset) - 10) % 7 == 0:
+
+            logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
             ml.finetune(config=config,
                         user_id=user_id,
                         channel=channel,
@@ -80,19 +95,13 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
                         labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
                         texts=dataset[dataset['posts'].notna()]['posts'].tolist()
                         )
-            if
+
     else:
+
         if len(request.posts) == 1 or len(request.posts) == 0:
             return Response('Length Required', status_code=411)
 
-        # thread = Thread(target=ml.fit, kwargs={
-        #     "texts": request.posts
-        #     "labels": request.labels,
-        #     "user_id": user_id,
-        #     "channel": channel,
-        # })
-        #
-        # thread.start()
+        logging.info(f"Started training model for user {user_id}:{channel}")
 
         await ml.fit(
             config=config,
@@ -100,10 +109,13 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
             labels=request.labels,
             user_id=user_id,
             channel=channel,
-            posts_tf_idf=dataset['posts'].tolist()
+            texts_tf_idf=dataset['posts'].tolist()
         )
 
     dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+
+    files.save_dataset(user_id, channel, dataset)
+    logging.debug(f"Dataset for user {user_id}:{channel} saved")
 
     return Response(status_code=202)
 
@@ -116,6 +128,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         return Response('User Not Found', status_code=404)
 
     posts, status_code = await get_posts(channel, 50, request.time)
+    logging.debug(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     dataset = files.load_dataset(user_id, channel)
     config = files.load_config(user_id, channel)
@@ -146,20 +159,22 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     content = {
         "posts": response,
-        "markup": dataset[dataset.labels.isna()].sort_values(by="confidence")[0],
+        "markup": dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts,
     }
 
     if config['drop']:
         dataset = dataset.sort_values(by="timestamp").drop(index=0)
-        print(dataset['timestamp'])
+        logging.debug(f"Row removed from dataset for user {user_id}:{channel}")
+
     elif len(dataset) + 1 >= 1000:
         config['drop'] = True
+        logging.debug(f"Set 'drop' in config for user {user_id}:{channel}")
 
-    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': posts[-1],
-                                                                           'labels': np.nan,
-                                                                           'confidence': np.nan,
-                                                                           'timestamp': datetime.now()
-                                                                           })]))
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': [posts[-1]],
+                                                                           'labels': [np.nan],
+                                                                           'confidence': [np.nan],
+                                                                           'timestamp': [datetime.now()]
+                                                                           })], ignore_index=True))
 
     return JSONResponse(
         content=content,

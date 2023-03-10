@@ -14,7 +14,7 @@ from catboost import CatBoostClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
 from core.files import save_model, load_model
-from core.telegram import get_posts
+import logging
 
 warnings.filterwarnings("ignore")
 
@@ -103,24 +103,25 @@ def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel:
 
     model, tfidf = load_model(user_id, channel, config)
 
-    return [abs(i - 0.5) for i in model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()]
+    prediction = model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
+
+    return [i[1] for i in prediction]
 
 
-async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str, texts_tf_idf: list[str], language='russian') -> None:
-
-    # Создание и обучение TF-IDF на 50 постах с канала
+async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
+              texts_tf_idf: list[str], language='russian') -> None:
     feature_extractor = KeyWords(language)
     tfidf = feature_extractor.get_tfifd(texts_tf_idf)
 
-    # Создание и обучение модели
     model = SVC(probability=True)
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
 
-    # Сохранение модели
     save_model(user_id, channel, model, tfidf, config)
 
 
 def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:
+    """Вызывает модель для выбора лучших постов из texts"""
+
     feature_extractor = KeyWords(language)
 
     model, tfidf = load_model(user_id, channel, config)
@@ -128,11 +129,16 @@ def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, l
     return model.predict(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
 
-def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: list[str], user_id: [int, str], channel: str, language='russian') -> None:
+def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: list[str], user_id: [int, str],
+             channel: str, language='russian') -> None:
+    """Дообучает модель на новых данных"""
+
     feature_extractor = KeyWords(language)
     tfidf = feature_extractor.get_tfifd(texts_tf_idf)
     X = tfidf.transform(feature_extractor.preprocessing(texts)).toarray()
+
     if config['model'] != 'CatBoost':
+
         X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.33, random_state=42)
         model_1 = SVC(probability=True)
         model_1.fit(X_train, y_train)
@@ -141,8 +147,12 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
         model_2.fit(X_train, y_train)
         svm_f1 = f1_score(y_test, model_1.predict(X_test))
         cb_f1 = f1_score(y_test, model_1.predict(X_test))
-        print(f'Dataset size: {len(texts)}\n\tCatboost f1: {cb_f1}\n\tSVM f1: {svm_f1}')
+
+        logging.info(
+            f'Dataset size: {len(texts)}\n\tCatboost f1: {cb_f1}\n\tSVM f1: {svm_f1} for user {user_id}:{channel}')
+
         if cb_f1 > svm_f1:
+            logging.info(f"Set model CatBoost for user {user_id}:{channel}")
             config['model'] = 'CatBoost'
             model = CatBoostClassifier()
             model.fit(X, labels)
@@ -151,9 +161,8 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
             model = SVC(probability=True)
             model.fit(X, labels)
             save_model(user_id, channel, model, tfidf, config)
+
     else:
         model = CatBoostClassifier()
         model.fit(X, labels)
         save_model(user_id, channel, model, tfidf, config)
-
-
