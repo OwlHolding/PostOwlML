@@ -1,7 +1,5 @@
 import nltk
 import string
-
-import pandas as pd
 import razdel
 import warnings
 from nltk.corpus import stopwords
@@ -105,11 +103,13 @@ def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel:
 
     prediction = model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
-    return [i[1] for i in prediction]
+    return [abs(i[1] - 0.5) for i in prediction]
 
 
 async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
               texts_tf_idf: list[str], language='russian') -> None:
+    """Инициализирует и учит модель"""
+
     feature_extractor = KeyWords(language)
     tfidf = feature_extractor.get_tfifd(texts_tf_idf)
 

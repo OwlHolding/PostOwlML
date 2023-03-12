@@ -13,7 +13,7 @@ from core import ml
 
 app = FastAPI()
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s")
 
 
 @app.post('/register/{user_id}/')
@@ -79,7 +79,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     config = files.load_config(user_id, channel)
 
     for i in range(len(request.posts)):
-        dataset.loc[dataset['posts'] == request.posts[i], 'labels'] = int(request.labels[i])
+        dataset.loc[dataset['posts'] == request.posts[i], 'labels'] = request.labels[i]
 
     if request.finetune:
 
