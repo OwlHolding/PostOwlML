@@ -103,7 +103,7 @@ def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel:
 
     prediction = model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
-    return [abs(i[1] - 0.5) for i in prediction]
+    return [(abs(i[0]-0.5) + abs(i[1]-0.5))/2 for i in prediction]
 
 
 async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
@@ -139,7 +139,7 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
 
     if config['model'] != 'CatBoost':
 
-        X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.33, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.3, random_state=42)
         model_1 = SVC(probability=True)
         model_1.fit(X_train, y_train)
 

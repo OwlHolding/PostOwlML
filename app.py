@@ -85,7 +85,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         logging.debug(f'Dataset Size for user {user_id}:{channel} is {len(dataset)}')
 
-        if (len(dataset) - 10) % 7 == 0:
+        if (len(dataset[dataset['labels'].notna()]) - 10) % 7 == 0:
 
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
             ml.finetune(config=config,
