@@ -81,9 +81,9 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     for i in range(len(request.posts)):
         dataset.loc[dataset['posts'] == request.posts[i], 'labels'] = request.labels[i]
 
-    if request.finetune:
+    logging.debug(f'Dataset Size for user {user_id}:{channel} is {len(dataset)}')
 
-        logging.debug(f'Dataset Size for user {user_id}:{channel} is {len(dataset)}')
+    if request.finetune:
 
         if (len(dataset[dataset['labels'].notna()]) - 10) % 7 == 0:
 
@@ -93,7 +93,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
                         channel=channel,
                         texts_tf_idf=dataset['posts'].tolist(),
                         labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
-                        texts=dataset[dataset['posts'].notna()]['posts'].tolist()
+                        texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
                         )
 
     else:
