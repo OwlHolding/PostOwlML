@@ -13,7 +13,7 @@ from core import ml
 
 app = FastAPI()
 
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt", filemode="w")
 
 
 @app.post('/register/{user_id}/')
