@@ -6,7 +6,7 @@ import pandas as pd
 import logging
 
 from core import files
-from core.requests import *
+from core.request import *
 from core.telegram import get_posts
 from core.utils import valid_channel, valid_user
 from core import ml
