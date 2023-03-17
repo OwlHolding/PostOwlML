@@ -37,6 +37,11 @@ class KeyWords:
         return [re.sub('https?:\/\/.*?[\s+]', '', text) for text in documents]
 
     @staticmethod
+    def remove_tags(documents: list) -> list:
+        remove = re.compile('<.*?>')
+        return [remove.sub('', text) for text in documents]
+
+    @staticmethod
     def replace_newline(documents: list) -> list:
         documents = [text.replace('\n', ' ') + ' ' for text in documents]
         return documents
@@ -76,6 +81,7 @@ class KeyWords:
 
     def preprocessing(self, documents: list) -> list:
         documents = self.replace_newline(documents)
+        documents = self.remove_tags(documents)
         documents = self.remove_urls(documents)
         documents = self.remove_strange_symbols(documents)
         documents = self.to_lower(documents)
