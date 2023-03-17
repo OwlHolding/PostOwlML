@@ -1,5 +1,3 @@
-import threading
-import logging
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
@@ -7,30 +5,24 @@ from threading import Thread
 import re
 
 
-class ChannelPool:
-
-    def __init__(self):
-        self.main = dict()
-
-    def __getitem__(self, item):
-        if not (item in self.main.keys()):
-            self.main[item] = dict()
-
-        return self.main
+def get_url(url, results, index):
+    resp = requests.get(url)
+    if resp.status_code == 200:
+        results[index] = resp.text
 
 
-pool = ChannelPool()
+def download_html(urls):
+    threads = [None] * len(urls)
+    results = [None] * len(urls)
 
+    for i in range(len(threads)):
+        threads[i] = Thread(target=get_url, args=[urls[i], results, i])
+        threads[i].start()
 
-class Worker(Thread):
+    for i in range(len(threads)):
+        threads[i].join()
 
-    def __init__(self, channel, post_id):
-        super().__init__()
-        self.post_id = post_id
-        self.channel = channel
-
-    def run(self):
-        pool[self.channel][self.post_id] = requests.get(f'https://t.me/{self.channel}/{self.post_id}?embed=1&mode=tme').text
+    return results
 
 
 async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
@@ -49,23 +41,12 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
     post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')[
         'data-post']
 
-    for i in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1):
-        worker = Worker(channel, i)
-        worker.start()
+    url_list = [f'https://t.me/{channel}/{i}?embed=1&mode=tme' for i in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1)]
 
-    logging.debug(f"Started thread stack for {channel}")
+    result = download_html(url_list)
 
-    main_thread = threading.main_thread()
-
-    for t in threading.enumerate():
-        if t is main_thread:
-            continue
-        t.join()
-
-    logging.debug(f"Threading finished success")
-
-    for page_id in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1):
-        html = BeautifulSoup(pool[channel][page_id], "html.parser")
+    for page in result:
+        html = BeautifulSoup(page, "html.parser")
         try:
             text = re.sub('<div [^<]+?>', '', ''.join(
                 map(str,
@@ -82,6 +63,7 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
                 response.add(text)
 
     if len(response) == 0:
-        return "", 400
+        return "", 200
 
     return list(response), 200
+

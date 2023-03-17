@@ -42,4 +42,4 @@ pyarrow==11.0.0
 bs4~=0.0.1
 beautifulsoup4~=4.11.2
 pymemcache~=4.0.0
-aiohttp~=3.8.4
+scikit-learn-intelex~=2023.0.1
