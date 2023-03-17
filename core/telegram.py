@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from threading import Thread
+import re
 
 
 class ChannelPool:
@@ -66,10 +67,10 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
     for page_id in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1):
         html = BeautifulSoup(pool[channel][page_id], "html.parser")
         try:
-            text = ''.join(
+            text = re.sub('<div [^<]+?>', '', ''.join(
                 map(str,
                     html.findAll('div', class_='tgme_widget_message_text js-message_text')[0].contents)).replace(
-                '<br/>', '\n')
+                '<br/>', '\n').replace("</div>", ""))
             pub_time = datetime.strptime(html.find('time')['datetime'], "%Y-%m-%dT%H:%M:%S%z")
         except:
             pass

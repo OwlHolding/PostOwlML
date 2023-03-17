@@ -22,10 +22,6 @@ logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s 
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
-    logging.debug(dataset)
-    logging.debug(type(config))
-    logging.debug(config)
-
     dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
     files.save_dataset(user_id, channel, dataset)
     logging.debug(f"Dataset for user {user_id}:{channel} saved")
@@ -116,14 +112,6 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
             return Response('Length Required', status_code=411)
 
         logging.info(f"Started training model for user {user_id}:{channel}")
-
-        # tr = Thread(target=ml.fit, args={"config": config,
-        #                                  "texts": request.posts,
-        #                                  "labels": request.labels,
-        #                                  "user_id": user_id,
-        #                                  "channel": channel,
-        #                                  "texts_tf_idf": dataset['posts'].tolist()})
-        # tr.start()
 
         ml.fit(config=config,
                texts=request.posts,
