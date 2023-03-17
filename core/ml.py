@@ -38,8 +38,7 @@ class KeyWords:
 
     @staticmethod
     def remove_tags(documents: list) -> list:
-        remove = re.compile('<.*?>')
-        return [remove.sub('', text) for text in documents]
+        return [re.sub('<[^<]+?>', '', i) for i in documents]
 
     @staticmethod
     def replace_newline(documents: list) -> list:
@@ -86,6 +85,7 @@ class KeyWords:
         documents = self.to_lower(documents)
         documents = self.lemmatize(documents)
         documents = self.remove_numbers(documents)
+        documents = self.remove_tags(documents)
         tokenized_documents = self.tokenize(documents)
         tokenized_documents = self.remove_stop_words(tokenized_documents)
         tokenized_documents = self.remove_punctuation(tokenized_documents)
@@ -95,7 +95,7 @@ class KeyWords:
     def get_tfifd(self, documents: list) -> TfidfVectorizer:
         clean_documents = self.preprocessing(documents)
 
-        tf_idf_vectorizer = TfidfVectorizer()
+        tf_idf_vectorizer = TfidfVectorizer(max_features=5000)
         tf_idf_vectorizer.fit(clean_documents)
 
         return tf_idf_vectorizer
@@ -108,11 +108,11 @@ def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel:
 
     prediction = model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
-    return [(abs(i[0]-0.5) + abs(i[1]-0.5))/2 for i in prediction]
+    return [(abs(i[0] - 0.5) + abs(i[1] - 0.5)) / 2 for i in prediction]
 
 
 def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
-              texts_tf_idf: list[str], language='russian') -> None:
+        texts_tf_idf: list[str], language='russian') -> None:
     """Инициализирует и учит модель"""
 
     feature_extractor = KeyWords(language)

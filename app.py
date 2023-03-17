@@ -1,3 +1,6 @@
+from sklearnex import patch_sklearn
+patch_sklearn()
+
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -16,6 +19,16 @@ app = FastAPI()
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
                     filemode="w")
+
+
+def save_confidence(config, dataset, user_id, channel) -> None:
+    logging.debug(dataset)
+    logging.debug(type(config))
+    logging.debug(config)
+
+    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+    files.save_dataset(user_id, channel, dataset)
+    logging.debug(f"Dataset for user {user_id}:{channel} saved")
 
 
 @app.post('/register/{user_id}/')
@@ -83,7 +96,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     for i in range(len(request.posts)):
         dataset.loc[dataset['posts'] == request.posts[i], 'labels'] = request.labels[i]
 
-    logging.debug(f'Dataset Size for user {user_id}:{channel} is {len(dataset)}')
+    logging.info(f'Dataset Size for user {user_id}:{channel} is {len(dataset)}')
 
     if request.finetune:
 
@@ -122,17 +135,10 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
         logging.info(f"Model trained for user {user_id}:{channel}")
 
     logging.info(f"Started get_confidence {user_id}:{channel}")
-    # tr = Thread(target=save_confidence, args={
-    #     "config": config,
-    #     "dataset": dataset,
-    #     "user_id": user_id,
-    #     "channel": channel,
-    # })
-    #
-    # tr.start()
-    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
-    files.save_dataset(user_id, channel, dataset)
-    logging.debug(f"Dataset for user {user_id}:{channel} saved")
+
+    tr = Thread(target=save_confidence, args=[config, dataset, user_id, channel])
+    tr.start()
+
     return Response(status_code=202)
 
 
