@@ -1,14 +1,35 @@
+import threading
+import logging
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-import aiohttp
-import asyncio
+from threading import Thread
 
 
-async def get_one_post(session, url):
-    async with session.get(url) as response:
-        text = await response.text()
-        return text, url
+class ChannelPool:
+
+    def __init__(self):
+        self.main = dict()
+
+    def __getitem__(self, item):
+        if not (item in self.main.keys()):
+            self.main[item] = dict()
+
+        return self.main
+
+
+pool = ChannelPool()
+
+
+class Worker(Thread):
+
+    def __init__(self, channel, post_id):
+        super().__init__()
+        self.post_id = post_id
+        self.channel = channel
+
+    def run(self):
+        pool[self.channel][self.post_id] = requests.get(f'https://t.me/{self.channel}/{self.post_id}?embed=1&mode=tme').text
 
 
 async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
@@ -27,28 +48,23 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
     post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')[
         'data-post']
 
-    url_list = [f'https://t.me/{channel}/{i}?embed=1&mode=tme' for i in
-                range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1)]
+    for i in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1):
+        worker = Worker(channel, i)
+        worker.start()
 
-    tasks = []
-    headers = {
-        "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"}
-    async with aiohttp.ClientSession(headers=headers) as session:
-        for url in url_list:
-            tasks.append(get_one_post(session, url))
+    logging.debug(f"Started thread stack for {channel}")
 
-        htmls = await asyncio.gather(*tasks)
+    main_thread = threading.main_thread()
 
-    pages = []
-
-    for html in htmls:
-        if html is not None:
-             pages.append(html[0])
-        else:
+    for t in threading.enumerate():
+        if t is main_thread:
             continue
+        t.join()
 
-    for page in pages:
-        html = BeautifulSoup(page, "html.parser")
+    logging.debug(f"Threading finished success")
+
+    for page_id in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1):
+        html = BeautifulSoup(pool[channel][page_id], "html.parser")
         try:
             text = ''.join(
                 map(str,

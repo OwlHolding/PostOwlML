@@ -112,7 +112,7 @@ def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel:
     return [(abs(i[0]-0.5) + abs(i[1]-0.5))/2 for i in prediction]
 
 
-async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
+def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
               texts_tf_idf: list[str], language='russian') -> None:
     """Инициализирует и учит модель"""
 
@@ -123,6 +123,7 @@ async def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, 
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
 
     save_model(user_id, channel, model, tfidf, config)
+    logging.info(f"Model trained for user {user_id}:{channel}")
 
 
 def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:

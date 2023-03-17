@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 import logging
+from threading import Thread
 
 from core import files
 from core.request import *
@@ -13,7 +14,14 @@ from core import ml
 
 app = FastAPI()
 
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt", filemode="w")
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
+                    filemode="w")
+
+
+def save_confidence(config, dataset, user_id, channel):
+    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+    files.save_dataset(user_id, channel, dataset)
+    logging.debug(f"Dataset for user {user_id}:{channel} saved")
 
 
 @app.post('/register/{user_id}/')
@@ -86,7 +94,6 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     if request.finetune:
 
         if (len(dataset[dataset['labels'].notna()]) - 10) % 7 == 0:
-
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
             ml.finetune(config=config,
                         user_id=user_id,
@@ -103,19 +110,23 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         logging.info(f"Started training model for user {user_id}:{channel}")
 
-        await ml.fit(
-            config=config,
-            texts=request.posts,
-            labels=request.labels,
-            user_id=user_id,
-            channel=channel,
-            texts_tf_idf=dataset['posts'].tolist()
-        )
+        tr = Thread(target=ml.fit, args={"config": config,
+                                         "texts": request.posts,
+                                         "labels": request.labels,
+                                         "user_id": user_id,
+                                         "channel": channel,
+                                         "texts_tf_idf": dataset['posts'].tolist()})
+        tr.start()
 
-    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+    logging.info(f"Started get_confidence {user_id}:{channel}")
+    tr = Thread(target=save_confidence, args={
+        "config": config,
+        "dataset": dataset,
+        "user_id": user_id,
+        "channel": channel,
+    })
 
-    files.save_dataset(user_id, channel, dataset)
-    logging.debug(f"Dataset for user {user_id}:{channel} saved")
+    tr.start()
 
     return Response(status_code=202)
 
