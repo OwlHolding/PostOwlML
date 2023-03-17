@@ -18,12 +18,6 @@ logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s 
                     filemode="w")
 
 
-def save_confidence(config, dataset, user_id, channel):
-    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
-    files.save_dataset(user_id, channel, dataset)
-    logging.debug(f"Dataset for user {user_id}:{channel} saved")
-
-
 @app.post('/register/{user_id}/')
 async def register(user_id: int) -> Response:
     """Регистрация новых пользователей"""
@@ -110,24 +104,35 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         logging.info(f"Started training model for user {user_id}:{channel}")
 
-        tr = Thread(target=ml.fit, args={"config": config,
-                                         "texts": request.posts,
-                                         "labels": request.labels,
-                                         "user_id": user_id,
-                                         "channel": channel,
-                                         "texts_tf_idf": dataset['posts'].tolist()})
-        tr.start()
+        # tr = Thread(target=ml.fit, args={"config": config,
+        #                                  "texts": request.posts,
+        #                                  "labels": request.labels,
+        #                                  "user_id": user_id,
+        #                                  "channel": channel,
+        #                                  "texts_tf_idf": dataset['posts'].tolist()})
+        # tr.start()
+
+        ml.fit(config=config,
+               texts=request.posts,
+               labels=request.labels,
+               user_id=user_id,
+               channel=channel,
+               texts_tf_idf=dataset['posts'].tolist())
+
+        logging.info(f"Model trained for user {user_id}:{channel}")
 
     logging.info(f"Started get_confidence {user_id}:{channel}")
-    tr = Thread(target=save_confidence, args={
-        "config": config,
-        "dataset": dataset,
-        "user_id": user_id,
-        "channel": channel,
-    })
-
-    tr.start()
-
+    # tr = Thread(target=save_confidence, args={
+    #     "config": config,
+    #     "dataset": dataset,
+    #     "user_id": user_id,
+    #     "channel": channel,
+    # })
+    #
+    # tr.start()
+    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+    files.save_dataset(user_id, channel, dataset)
+    logging.debug(f"Dataset for user {user_id}:{channel} saved")
     return Response(status_code=202)
 
 
@@ -169,7 +174,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             response.append(posts[i])
 
     content = {
-        "posts": response,
+        "posts": response[:5],
         "markup": dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts,
     }
 

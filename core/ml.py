@@ -81,7 +81,6 @@ class KeyWords:
 
     def preprocessing(self, documents: list) -> list:
         documents = self.replace_newline(documents)
-        documents = self.remove_tags(documents)
         documents = self.remove_urls(documents)
         documents = self.remove_strange_symbols(documents)
         documents = self.to_lower(documents)
@@ -123,7 +122,6 @@ def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], 
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
 
     save_model(user_id, channel, model, tfidf, config)
-    logging.info(f"Model trained for user {user_id}:{channel}")
 
 
 def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:

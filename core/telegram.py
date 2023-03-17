@@ -68,8 +68,7 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
         try:
             text = ''.join(
                 map(str,
-                    html.findAll('div', class_='tgme_widget_message_text js-message_text')[0].contents)).replace(
-                '<br/>', '\n')
+                    html.findAll('div', class_='tgme_widget_message_text js-message_text')[0].text))
             pub_time = datetime.strptime(html.find('time')['datetime'], "%Y-%m-%dT%H:%M:%S%z")
         except:
             pass
