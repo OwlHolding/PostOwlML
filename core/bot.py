@@ -16,7 +16,7 @@ def get_log(message):
         with open("log.txt", "r") as file:
             log = file.read().split('\n')[::-1]
         try:
-            log = log[:10]
+            log = log[:20]
         except IndexError:
             pass
 
@@ -26,8 +26,6 @@ def get_log(message):
 @bot.message_handler(commands=['log_all'])
 def get_log(message):
     if message.chat.id in white_list:
-        with open("log.txt", "r") as file:
-            log = file.read().split('\n')
-
-        bot.send_message(message.chat.id, "\n".join(log))
+        f = open("log.txt", 'r')
+        bot.send_message(message.chat.id, f)
 

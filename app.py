@@ -24,8 +24,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("telebot").setLevel(logging.WARNING)
 
-bot_thread = Thread(target=bot.infinity_polling)
-bot_thread.start()
+# bot_thread = Thread(target=bot.infinity_polling)
+# bot_thread.start()
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
