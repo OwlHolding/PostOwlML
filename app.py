@@ -12,7 +12,7 @@ from threading import Thread
 from core import files
 from core.request import *
 from core.telegram import get_posts
-from core.utils import valid_channel, valid_user
+from core.utils import valid_channel, valid_user, remove_tags
 from core import ml
 from core.bot import bot
 
@@ -77,7 +77,7 @@ async def create_model(user_id: int, channel: str) -> Response:
     logging.info(f"The dataset for {user_id}:{channel} has been updated")
 
     content = {
-        'posts': posts[:10]
+        'posts': [remove_tags(post) for post in posts[:10]]
     }
 
     return JSONResponse(
@@ -175,8 +175,8 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             response.append(posts[i])
 
     content = {
-        "posts": response[:5],
-        "markup": dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts,
+        "posts":  [remove_tags(post) for post in response[:5]],
+        "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
     }
 
     if config['drop']:

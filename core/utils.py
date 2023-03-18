@@ -1,8 +1,9 @@
 import os
 from bs4 import BeautifulSoup
+import time
 
 tag_list = [
-    "<b", "<strong", "<i", "<em", "<u", "<ins", "<s", "<strike", "<del", "<span", "<tg-spoiler", "<b", "<code", "<pre", "<a"
+    "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "span", "tg-spoiler", "code", "pre", "a", "img"
 ]
 
 
@@ -23,7 +24,7 @@ def valid_channel(user_id: int, channel: str) -> bool:
     return False
 
 
-def retry(times, exceptions):
+def retry(times, exceptions, time_sleep):
     """Декоратор для повторения функции"""
 
     def decorator(func):
@@ -33,22 +34,23 @@ def retry(times, exceptions):
                 try:
                     return func(*args, **kwargs)
                 except exceptions:
+                    time.sleep(time_sleep)
                     attempt += 1
             return func(*args, **kwargs)
         return newfn
     return decorator
 
 
-def remove_tags(text):
+def remove_tags(text: str) -> str:
     """Удаление нечитаемых тегов"""
 
-    html = BeautifulSoup(text, 'parser.html')
+    html = BeautifulSoup(text, 'html.parser')
 
     container = html.find('div')
-    keep =[]
+    keep = []
 
     for node in container.descendants:
-        if not node.name or node.name == 'a' or node.name == 'img':
+        if not node.name or node.name in tag_list:
             keep.append(node)
-    return keep
+    return "".join(map(str, keep))
 

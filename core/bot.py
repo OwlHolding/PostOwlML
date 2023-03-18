@@ -20,4 +20,14 @@ def get_log(message):
         except IndexError:
             pass
 
+        bot.send_message(message.chat.id, "\n".join(log[::-1]))
+
+
+@bot.message_handler(commands=['log_all'])
+def get_log(message):
+    if message.chat.id in white_list:
+        with open("log.txt", "r") as file:
+            log = file.read().split('\n')
+
         bot.send_message(message.chat.id, "\n".join(log))
+

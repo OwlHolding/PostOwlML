@@ -21,3 +21,8 @@ def test_ping():
     response = client.post('/register/1')
     assert response.status_code // 10 == 20
 
+
+def test_register_channel():
+    response = client.post('/regchannel/1/forbesrussia')
+    assert response.status_code // 10 == 20
+

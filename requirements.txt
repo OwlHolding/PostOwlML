@@ -52,3 +52,4 @@ zipp==3.15.0
 pyTelegramBotAPI==4.10.0
 pytest==7.2.2
 httpx==0.23.3
+random_user_agent==1.0.1
