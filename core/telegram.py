@@ -42,14 +42,13 @@ def get_random_agent() -> dict:
     return headers
 
 
-@retry(times=20, exceptions=IndexError, time_sleep=10)
+@retry(times=30, exceptions=IndexError, time_sleep=5)
 def get_index(channel: str) -> str:
     first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
-    soup = BeautifulSoup(first_page.text, "html.parser")
+    soup = BeautifulSoup("<div>"+first_page.text+"", "html.parser")
 
     last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
-    post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')[
-        'data-post']
+    post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')['data-post']
 
     return post_id
 
