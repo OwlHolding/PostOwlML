@@ -42,7 +42,7 @@ def get_random_agent() -> dict:
     return headers
 
 
-@retry(times=10, exceptions=IndexError, time_sleep=5)
+@retry(times=20, exceptions=IndexError, time_sleep=10)
 def get_index(channel: str) -> str:
     first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
     soup = BeautifulSoup(first_page.text, "html.parser")
