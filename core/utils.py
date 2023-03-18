@@ -44,7 +44,7 @@ def retry(times, exceptions, time_sleep):
 def remove_tags(text: str) -> str:
     """Удаление нечитаемых тегов"""
 
-    html = BeautifulSoup(text, 'html.parser')
+    html = BeautifulSoup("<div>" + text + "</div>", 'html.parser')
 
     container = html.find('div')
     keep = []
