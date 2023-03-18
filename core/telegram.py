@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from threading import Thread
 import re
 from core.utils import retry
+import time
 
 
 def get_url(url, results, index):
@@ -26,7 +27,7 @@ def download_html(urls):
     return results
 
 
-@retry(times=3, exceptions=Exception)
+@retry(times=5, exceptions=IndexError)
 async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
     """Запрос постов с телеграмм канала"""
     if times:
@@ -36,12 +37,21 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
 
     response = set()
 
-    page = requests.get(f'https://t.me/s/{channel}/')
-    soup = BeautifulSoup(page.text, "html.parser")
+    try:
+        page = requests.get(f'https://t.me/s/{channel}/')
+        soup = BeautifulSoup(page.text, "html.parser")
 
-    last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
-    post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')[
-        'data-post']
+        last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
+        post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')[
+            'data-post']
+    except IndexError:
+        time.sleep(1)
+        page = requests.get(f'https://t.me/s/{channel}/')
+        soup = BeautifulSoup(page.text, "html.parser")
+
+        last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
+        post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')[
+            'data-post']
 
     url_list = [f'https://t.me/{channel}/{i}?embed=1&mode=tme' for i in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1)]
 
@@ -65,7 +75,7 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
                 response.add(text)
 
     if len(response) == 0:
-        return "", 200
+        return [""], 200
 
     return list(response), 200
 

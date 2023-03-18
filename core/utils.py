@@ -1,4 +1,5 @@
 import os
+from bs4 import BeautifulSoup
 
 tag_list = [
     "<b", "<strong", "<i", "<em", "<u", "<ins", "<s", "<strike", "<del", "<span", "<tg-spoiler", "<b", "<code", "<pre", "<a"
@@ -41,18 +42,13 @@ def retry(times, exceptions):
 def remove_tags(text):
     """Удаление нечитаемых тегов"""
 
-    stack = []
+    html = BeautifulSoup(text, 'parser.html')
 
-    answer = ""
+    container = html.find('div')
+    keep =[]
 
-    for word in text.split():
-        if "<" in word and word not in tag_list:
-            stack.append(word)
+    for node in container.descendants:
+        if not node.name or node.name == 'a' or node.name == 'img':
+            keep.append(node)
+    return keep
 
-        if ">" in word:
-            stack.pop()
-
-        elif len(stack) == 0:
-            answer += f" {word} "
-
-    return answer
