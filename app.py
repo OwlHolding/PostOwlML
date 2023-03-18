@@ -14,17 +14,24 @@ from core.request import *
 from core.telegram import get_posts
 from core.utils import valid_channel, valid_user
 from core import ml
+from core.bot import bot
 
 app = FastAPI()
 
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
                     filemode="w")
+
+logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("telebot").setLevel(logging.WARNING)
+
+bot_thread = Thread(target=bot.infinity_polling)
+bot_thread.start()
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
     dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
     files.save_dataset(user_id, channel, dataset)
-    logging.debug(f"Dataset for user {user_id}:{channel} saved")
+    logging.info(f"Dataset for user {user_id}:{channel} saved")
 
 
 @app.post('/register/{user_id}/')
@@ -50,7 +57,7 @@ async def create_model(user_id: int, channel: str) -> Response:
         return Response('User Not Found', status_code=404)
 
     posts, status_code = await get_posts(channel, 50, 0)
-    logging.debug(f"Successfully received {len(posts)} posts from the channel {channel}")
+    logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     if status_code == 400:
         return Response('Channel Not Exists', status_code=status_code)
@@ -67,7 +74,7 @@ async def create_model(user_id: int, channel: str) -> Response:
                                                                       'timestamp': [datetime.now() for _ in
                                                                                     range(len(posts))]
                                                                       })]))
-    logging.debug(f"The dataset for {user_id}:{channel} has been updated")
+    logging.info(f"The dataset for {user_id}:{channel} has been updated")
 
     content = {
         'posts': posts[:10]
@@ -138,7 +145,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         return Response('User Not Found', status_code=404)
 
     posts, status_code = await get_posts(channel, 50, request.time)
-    logging.debug(f"Successfully received {len(posts)} posts from the channel {channel}")
+    logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     dataset = files.load_dataset(user_id, channel)
     config = files.load_config(user_id, channel)
@@ -178,7 +185,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     elif len(dataset) + 1 >= 1000:
         config['drop'] = True
-        logging.debug(f"Set 'drop' in config for user {user_id}:{channel}")
+        logging.info(f"Set 'drop' in config for user {user_id}:{channel}")
 
     files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': [posts[-1]],
                                                                            'labels': [np.nan],
