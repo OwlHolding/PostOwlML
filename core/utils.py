@@ -1,6 +1,7 @@
 import os
 from bs4 import BeautifulSoup
 import time
+import random
 
 tag_list = [
     "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "span", "tg-spoiler", "code", "pre", "a", "img"
@@ -24,7 +25,7 @@ def valid_channel(user_id: int, channel: str) -> bool:
     return False
 
 
-def retry(times, exceptions, time_sleep):
+def retry(times: int, exceptions, time_sleep: int, spread: int):
     """Декоратор для повторения функции"""
 
     def decorator(func):
@@ -34,7 +35,7 @@ def retry(times, exceptions, time_sleep):
                 try:
                     return func(*args, **kwargs)
                 except exceptions:
-                    time.sleep(time_sleep)
+                    time.sleep(time_sleep + random.randint(-spread, spread))
                     attempt += 1
             return func(*args, **kwargs)
         return newfn

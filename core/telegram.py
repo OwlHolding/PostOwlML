@@ -42,7 +42,7 @@ def get_random_agent() -> dict:
     return headers
 
 
-@retry(times=30, exceptions=IndexError, time_sleep=5)
+@retry(times=30, exceptions=IndexError, time_sleep=10, spread=5)
 def get_index(channel: str) -> str:
     first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
     soup = BeautifulSoup("<div>"+first_page.text+"", "html.parser")
@@ -53,7 +53,7 @@ def get_index(channel: str) -> str:
     return post_id
 
 
-@retry(times=5, exceptions=IndexError, time_sleep=5)
+@retry(times=5, exceptions=IndexError, time_sleep=5, spread=2)
 async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
     """Запрос постов с телеграмм канала"""
     if times:
