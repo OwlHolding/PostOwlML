@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from threading import Thread
 import re
+from core.utils import retry
 
 
 def get_url(url, results, index):
@@ -25,6 +26,7 @@ def download_html(urls):
     return results
 
 
+@retry(times=3, exceptions=Exception)
 async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
     """Запрос постов с телеграмм канала"""
     if times:
