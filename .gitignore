@@ -134,4 +134,6 @@ dmypy.json
 
 users
 users/*
+catboost_info
+catboost_info/*
 log.txt

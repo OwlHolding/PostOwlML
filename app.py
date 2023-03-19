@@ -1,4 +1,5 @@
 from sklearnex import patch_sklearn
+
 patch_sklearn()
 
 from fastapi import FastAPI, Response
@@ -14,7 +15,8 @@ from core.request import *
 from core.telegram import get_posts
 from core.utils import valid_channel, valid_user, remove_tags
 from core import ml
-from core.bot import bot
+
+# from core.bot import bot
 
 app = FastAPI()
 
@@ -24,8 +26,9 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("telebot").setLevel(logging.WARNING)
 
-bot_thread = Thread(target=bot.infinity_polling)
-bot_thread.start()
+
+# bot_thread = Thread(target=bot.infinity_polling)
+# bot_thread.start()
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
@@ -175,7 +178,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             response.append(posts[i])
 
     content = {
-        "posts":  [remove_tags(post) for post in response[:5]],
+        "posts": [remove_tags(post) for post in response[:5]],
         "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
     }
 

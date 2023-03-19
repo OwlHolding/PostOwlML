@@ -1,9 +1,10 @@
-import requests
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from threading import Thread
-from random_user_agent.user_agent import UserAgent
+
+import requests
+from bs4 import BeautifulSoup
 from random_user_agent.params import SoftwareName, OperatingSystem
+from random_user_agent.user_agent import UserAgent
 
 from core.utils import retry
 
@@ -65,7 +66,8 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
 
     post_id = get_index(channel)
 
-    url_list = [f'https://t.me/{channel}/{i}?embed=1&mode=tme' for i in range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1)]
+    url_list = [f'https://t.me/{channel}/{i}?embed=1&mode=tme' for i in
+                range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1)]
 
     result = download_html(url_list)
 
@@ -90,4 +92,3 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
         return [""], 200
 
     return list(response), 200
-

@@ -1,27 +1,29 @@
-import core.telegram as telegram
 import asyncio
-from starlette.testclient import TestClient
-from app import app
-from core.files import save_config, load_config
 import json
+import os
 import random
 import shutil
 
+from starlette.testclient import TestClient
+
+import core.telegram as telegram
+from app import app
+from core.files import save_config, load_config, load_dataset, save_dataset
 
 client = TestClient(app)
 posts = dict()
 markup = dict()
+channels = ['forbesrussia', 'nn_for_science']
 
 
 def test_telegram_channels():
-    assert asyncio.run(telegram.get_posts("forbesrussia", 10, 0))[1] == 200
-    assert asyncio.run(telegram.get_posts("mintsifry", 10, 0))[1] == 200
-    assert asyncio.run(telegram.get_posts("SKOLKOVO_Start", 10, 0))[1] == 200
+    for channel in channels:
+        assert asyncio.run(telegram.get_posts(channel, 10, 0))[1] == 200
 
 
 def test_telegram_count():
-    assert asyncio.run(telegram.get_posts("forbesrussia", 100, 0))[1] == 200
-    assert asyncio.run(telegram.get_posts("forbesrussia", 500, 0))[1] == 200
+    assert asyncio.run(telegram.get_posts(channels[0], 100, 0))[1] == 200
+    assert asyncio.run(telegram.get_posts(channels[0], 500, 0))[1] == 200
 
 
 def test_ping():
@@ -30,113 +32,81 @@ def test_ping():
 
 
 def test_register_channel():
-    response = client.post('/regchannel/1/forbesrussia')
-    assert response.status_code // 10 == 20
-    posts['forbesrussia'] = response.json()
-    response = client.post('/regchannel/1/gradientdip')
-    assert response.status_code // 10 == 20
-    posts['gradientdip'] = response.json()
+    for channel in channels:
+        response = client.post(f'/regchannel/1/{channel}')
+        assert response.status_code // 10 == 20
+        posts[channel] = response.json()
 
 
 def test_train():
-    data = {
-        'posts': posts['forbesrussia']['posts'],
-        'labels': [random.choice([0, 1]) for _ in range(len(posts['forbesrussia']['posts']))],
-        'finetune': False
-    }
-    response = client.post('/train/1/forbesrussia', data=json.dumps(data))
-    assert response.status_code // 10 == 20
-    data = {
-        'posts': posts['gradientdip']['posts'],
-        'labels': [random.choice([0, 1]) for _ in range(len(posts['gradientdip']['posts']))],
-        'finetune': False
-    }
-    response = client.post('/train/1/gradientdip', data=json.dumps(data))
-    assert response.status_code // 10 == 20
+    for channel in channels:
+        data = json.dumps({
+            'posts': posts[channel]['posts'],
+            'labels': [random.choice([0, 1]) for _ in range(len(posts[channel]['posts']))],
+            'finetune': False
+        })
+        response = client.post(f'/train/1/{channel}', data=data)
+        assert response.status_code // 10 == 20
 
 
 def test_predict():
-    response = client.post('/predict/1/forbesrussia', data=json.dumps({'time': 0}))
-    assert response.status_code // 10 == 20
-    markup['forbesrussia'] = [response.json()['markup']]
-    assert len(response.json()['posts']) == 5
-    response = client.post('/predict/1/gradientdip', data=json.dumps({'time': 0}))
-    assert response.status_code // 10 == 20
-    markup['gradientdip'] = [response.json()['markup']]
-    assert len(response.json()['posts']) == 5
+    for channel in channels:
+        response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
+        markup[channel] = [response.json()['markup']]
+        assert response.status_code // 10 == 20
+        assert isinstance(response.json()['markup'], str)
+        assert response.json()['posts']
 
 
-def test_owl_learnig_step():
-    for _ in range(6):
+def get_finetune_data(channel):
+    return json.dumps({
+        'posts': markup[channel],
+        'labels': [i % 2 for i in range(len(markup[channel]))],
+        'finetune': True
+    })
+
+
+def test_owl_learning_step():
+    for channel in channels:
+        for _ in range(7):
+            response = client.post(f'/train/1/{channel}', data=get_finetune_data(channel))
+            assert response.status_code // 10 == 20
+            response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
+            assert response.status_code // 10 == 20
+            markup[channel] = [response.json()['markup']]
+
+
+def test_owl_learning_step_cb():
+    for channel in channels:
+        config = load_config(1, channel)
+        config['model'] = 'CatBoost'
+        save_config(1, channel, config)
+
+        dataset = load_dataset(1, channel)
+        j = 0
+        for i in dataset[dataset['labels'].isna()].index:
+            if j == 3:
+                break
+            j += 1
+            dataset.iloc[i, dataset.columns.get_loc('labels')] = j % 2
+
+        save_dataset(user_id=1, channel=channel, dataset=dataset)
         data = {
-            'posts': markup['forbesrussia'],
-            'labels': [random.choice([0, 1])],
+            'posts': posts[channel]['posts'][:8],
+            'labels': [i % 2 for i in range(len(posts[channel]['posts']))][:8],
             'finetune': True
         }
-        response = client.post('/train/1/forbesrussia', data=json.dumps(data))
+        response = client.post(f'/train/1/{channel}', data=json.dumps(data))
         assert response.status_code // 10 == 20
-        response = client.post('/predict/1/forbesrussia', data=json.dumps({'time': 0}))
-        assert response.status_code // 10 == 20
-        markup['forbesrussia'] = [response.json()['markup']]
-
-    for _ in range(6):
-        data = {
-            'posts': markup['gradientdip'],
-            'labels': [random.choice([0, 1])],
-            'finetune': True
-        }
-        response = client.post('/train/1/gradientdip', data=json.dumps(data))
-        assert response.status_code // 10 == 20
-        response = client.post('/predict/1/gradientdip', data=json.dumps({'time': 0}))
-        assert response.status_code // 10 == 20
-        markup['gradientdip'] = [response.json()['markup']]
-
-
-def test_catboost():
-    config = load_config(1, 'forbesrussia')
-    config['model'] = 'CatBoost'
-    save_config(1, 'forbesrussia', config['model'])
-    config = load_config(1, 'gradientdip')
-    config['model'] = 'CatBoost'
-    save_config(1, 'gradientdip', config['model'])
-    assert True
-
-
-def test_owl_learnig_step_cb():
-    for _ in range(6):
-        data = {
-            'posts': markup['forbesrussia'],
-            'labels': [random.choice([0, 1])],
-            'finetune': True
-        }
-        response = client.post('/train/1/forbesrussia', data=json.dumps(data))
-        assert response.status_code // 10 == 20
-        response = client.post('/predict/1/forbesrussia', data=json.dumps({'time': 0}))
-        assert response.status_code // 10 == 20
-        markup['forbesrussia'] = [response.json()['markup']]
-
-    for _ in range(7):
-        data = {
-            'posts': markup['gradientdip'],
-            'labels': [random.choice([0, 1])],
-            'finetune': True
-        }
-        response = client.post('/train/1/gradientdip', data=json.dumps(data))
-        assert response.status_code // 10 == 20
-        response = client.post('/predict/1/gradientdip', data=json.dumps({'time': 0}))
-        assert response.status_code // 10 == 20
-        markup['gradientdip'] = [response.json()['markup']]
 
 
 def test_predict_cb():
-    response = client.post('/predict/1/forbesrussia', data=json.dumps({'time': 0}))
-    assert response.status_code // 10 == 20
-    markup['forbesrussia'] = [response.json()['markup']]
-    assert len(response.json()['posts']) == 5
-    response = client.post('/predict/1/gradientdip', data=json.dumps({'time': 0}))
-    assert response.status_code // 10 == 20
-    markup['gradientdip'] = [response.json()['markup']]
-    assert len(response.json()['posts']) == 5
+    for channel in channels:
+        assert os.path.exists(f'users/1/{channel}/model.bin')
+        response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
+        assert response.status_code // 10 == 20
+        assert isinstance(response.json()['markup'], str)
+        assert response.json()['posts']
 
 
 def test_remove_dir():

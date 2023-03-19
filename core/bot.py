@@ -28,4 +28,3 @@ def get_log(message):
     if message.chat.id in white_list:
         f = open("log.txt", 'r')
         bot.send_message(message.chat.id, f)
-

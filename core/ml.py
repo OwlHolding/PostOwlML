@@ -1,18 +1,20 @@
-import nltk
-import string
-import razdel
-import warnings
-from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer
-from pymystem3 import Mystem
-import re
-from nltk.stem.snowball import SnowballStemmer
-from sklearn.svm import SVC
-from catboost import CatBoostClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score
-from core.files import save_model, load_model
 import logging
+import re
+import string
+import warnings
+
+import nltk
+import razdel
+from catboost import CatBoostClassifier
+from nltk.corpus import stopwords
+from nltk.stem.snowball import SnowballStemmer
+from pymystem3 import Mystem
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+
+from core.files import save_model, load_model
 
 warnings.filterwarnings("ignore")
 
@@ -101,7 +103,8 @@ class KeyWords:
         return tf_idf_vectorizer
 
 
-def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list[float]:
+def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list[
+    float]:
     feature_extractor = KeyWords(language)
 
     model, tfidf = load_model(user_id, channel, config)
@@ -148,7 +151,7 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
         model_1 = SVC(probability=True)
         model_1.fit(X_train, y_train)
 
-        model_2 = CatBoostClassifier()
+        model_2 = CatBoostClassifier(verbose=0)
         model_2.fit(X_train, y_train)
         svm_f1 = f1_score(y_test, model_1.predict(X_test))
         cb_f1 = f1_score(y_test, model_1.predict(X_test))
@@ -159,7 +162,7 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
         if cb_f1 > svm_f1:
             logging.info(f"Set model CatBoost for user {user_id}:{channel}")
             config['model'] = 'CatBoost'
-            model = CatBoostClassifier()
+            model = CatBoostClassifier(verbose=0)
             model.fit(X, labels)
             save_model(user_id, channel, model, tfidf, config)
         else:
@@ -168,6 +171,6 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
             save_model(user_id, channel, model, tfidf, config)
 
     else:
-        model = CatBoostClassifier()
+        model = CatBoostClassifier(verbose=0)
         model.fit(X, labels)
         save_model(user_id, channel, model, tfidf, config)

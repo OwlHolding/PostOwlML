@@ -1,9 +1,10 @@
 """Модуль управления файлами для пар пользователь:канал"""
-import os
-import multiprocessing
-import pickle
-import pandas as pd
 import json
+import multiprocessing
+import os
+import pickle
+
+import pandas as pd
 from catboost import CatBoostClassifier
 
 
@@ -80,7 +81,7 @@ def load_model(user_id: [int, str], channel: str, config: dict):
 
         elif config['model'] == "CatBoost":
             model = CatBoostClassifier()
-            model.load_model(f"users/{user_id}/{channel}/model.bin")
+            model = model.load_model(f"users/{user_id}/{channel}/model.bin")
 
     return model, tfidf
 
