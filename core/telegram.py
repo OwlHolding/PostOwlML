@@ -43,12 +43,12 @@ def get_random_agent() -> dict:
     return headers
 
 
-@retry(times=30, exceptions=IndexError, min_delay=3, max_delay=15, factor=2, scale=1)
+@retry(times=20, exceptions=IndexError, min_delay=3, max_delay=15, factor=2, scale=1)
 def get_index(channel: str) -> str:
     first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
     soup = BeautifulSoup(first_page.text, "html.parser")
 
-    if soup.findAll('div', class_='tgme_page'):
+    if soup.findAll('div', class_='tgme_page') or soup.findAll('div', class_='footer_telegram_description') or soup.findAll('div', class_='fb-root'):
         return "0"
 
     last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
