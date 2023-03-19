@@ -1,7 +1,7 @@
 import os
-from bs4 import BeautifulSoup
 import time
 import numpy as np
+import re
 
 tag_list = [
     "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "span", "tg-spoiler", "code", "pre", "a", "img"
@@ -49,13 +49,4 @@ def retry(times: int, exceptions, min_delay: int, max_delay: int, factor=2, scal
 
 def remove_tags(text: str) -> str:
     """Удаление нечитаемых тегов"""
-
-    html = BeautifulSoup("<div>" + text + "</div>", 'html.parser')
-
-    container = html.find('div')
-    keep = []
-
-    for node in container.descendants:
-        if not node.name or node.name in tag_list:
-            keep.append(node)
-    return "".join(map(str, keep))
+    return re.sub(fr"<\/?(?!{'|'.join(tag_list)})[^>]*>", "", text)
