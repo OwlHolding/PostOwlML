@@ -1,7 +1,7 @@
 import os
 import time
 import numpy as np
-import re
+
 
 tag_list = [
     "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "span", "tg-spoiler", "code", "pre", "a", "img"
@@ -49,4 +49,38 @@ def retry(times: int, exceptions, min_delay: int, max_delay: int, factor=2, scal
 
 def remove_tags(text: str) -> str:
     """Удаление нечитаемых тегов"""
-    return re.sub(fr"<\/?(?!{'|'.join(tag_list)})[^>]*>", "", text)
+    open_ = -1
+    opened = []
+    buff = ""
+    allow = {"b", "strong", "i", "em", "u",
+             "ins", "s", "strike", "del", "span",
+             "tg-spoiler", "b", "code", "pre", "a"}
+
+    for i in range(len(text)):
+        if open_ != -1:
+            if text[i] == ' ' or text[i] == '>':
+                if buff not in allow:
+                    opened.append(open_)
+                buff = ""
+                open_ = -1
+            else:
+                buff += text[i] + ">"
+        else:
+            if text[i] == '<':
+                open_ = i
+
+    iter_ = 0
+    bad = False
+    result = ""
+
+    for i in range(len(text)):
+        if iter_ < len(opened) and opened[iter_] == i:
+            bad = True
+            iter_ += 1
+        if text[i] == '>':
+            bad = False
+            continue
+        if not bad:
+            result += text[i]
+
+    return result
