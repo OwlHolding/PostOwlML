@@ -48,6 +48,9 @@ def get_index(channel: str) -> str:
     first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
     soup = BeautifulSoup(first_page.text, "html.parser")
 
+    if soup.findAll('div', class_='tgme_page'):
+        return "0"
+
     last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
     post_id = last_post.find('div', class_='tgme_widget_message text_not_supported_wrap js-widget_message')['data-post']
 
@@ -65,6 +68,9 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
     response = set()
 
     post_id = get_index(channel)
+
+    if post_id == "0":
+        return [''], 400
 
     url_list = [f'https://t.me/{channel}/{i}?embed=1&mode=tme' for i in
                 range(int(post_id.split('/')[1]) - count + 1, int(post_id.split('/')[1]) + 1)]

@@ -16,7 +16,7 @@ from core.telegram import get_posts
 from core.utils import valid_channel, valid_user, remove_tags
 from core import ml
 
-# from core.bot import bot
+from core.bot import bot
 
 app = FastAPI()
 
@@ -27,8 +27,8 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("telebot").setLevel(logging.WARNING)
 
 
-# bot_thread = Thread(target=bot.infinity_polling)
-# bot_thread.start()
+bot_thread = Thread(target=bot.infinity_polling)
+bot_thread.start()
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
