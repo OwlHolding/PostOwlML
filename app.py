@@ -58,10 +58,15 @@ async def create_model(user_id: int, channel: str) -> Response:
     if not valid_user(user_id):
         return Response('User Not Found', status_code=404)
     try:
-        posts, status_code = get_posts(channel, 50, 0)
+        try:
+            posts, status_code = get_posts(channel, 50, 0)
+        except Exception as e:
+            logging.error(e)
+            posts, status_code = get_posts_rss(channel, 50, 0)
     except Exception as e:
         logging.error(e)
-        posts, status_code = get_posts_rss(channel, 50, 0)
+        return Response('Unsupported channel', status_code=400)
+
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     if status_code == 400:
@@ -108,7 +113,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
     if request.finetune:
 
-        if (len(dataset[dataset['labels'].notna()]) - 10) % 7 == 0:
+        if (len(dataset[dataset['labels'].notna()]) - 10) % 42 == 0:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
             ml.finetune(config=config,
                         user_id=user_id,

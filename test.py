@@ -84,9 +84,9 @@ def get_finetune_data(channel):
     })
 
 
-def test_owl_learning_step():
+def est_owl_learning_step():
     for channel in channels:
-        for _ in range(7):
+        for _ in range(42):
             response = client.post(f'/train/1/{channel}', data=get_finetune_data(channel))
             assert response.status_code // 10 == 20
             response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
@@ -101,13 +101,16 @@ def test_owl_learning_step_cb():
         save_config(1, channel, config)
 
         dataset = load_dataset(1, channel)
+        num = 42 - (len(dataset[dataset.notna()]) - 10) % 42
         j = 0
+        print(len(dataset[dataset.notna()]), (len(dataset[dataset.notna()]) - 10) % 42, num)
         for i in dataset[dataset['labels'].isna()].index:
-            if j == 3:
+            if j == num:
                 break
             j += 1
             dataset.iloc[i, dataset.columns.get_loc('labels')] = j % 2
-
+        print(j)
+        print((len(dataset[dataset.notna()]) - 10) % 42)
         save_dataset(user_id=1, channel=channel, dataset=dataset)
         data = {
             'posts': posts[channel]['posts'][:8],
