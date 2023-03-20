@@ -6,16 +6,39 @@ import requests
 from bs4 import BeautifulSoup
 from random_user_agent.params import SoftwareName, OperatingSystem
 from random_user_agent.user_agent import UserAgent
+from rss_parser import Parser
 
 from core.utils import retry
 
 channel_not_exist = 'If you have Telegram, you can contact '
+
 
 def channel_is_exist(channel):
     resp = requests.get(f"https://rsshub.app/telegram/channel/{channel}")
     if resp.status_code != 200:
         return False
     return True
+
+
+def get_posts_rss(channel, count, times):
+    if not channel_is_exist(channel):
+        return [''], 400
+    resp = requests.get(f"https://rsshub.app/telegram/channel/{channel}")
+    parser = Parser(xml=resp.content)
+    feed = parser.parse().feed
+
+    time_point = datetime(datetime.now().year, datetime.now().month, datetime.now().day, times // 60,
+                          times % 60,
+                          0) - timedelta(hours=24)
+
+    ok = []
+    for post in feed:
+        if datetime.strptime(post.publish_date, r"%a, %d %b %Y %H:%M:%S %Z").timestamp() > time_point.timestamp()\
+                and len(ok) <= count:
+            ok.append(post.description)
+
+    return ok, 200
+
 
 def get_url(url, results, index):
     resp = requests.get(url, headers=get_random_agent())
@@ -79,7 +102,7 @@ def get_index(channel: str) -> str:
 
 
 @retry(times=5, exceptions=IndexError, min_delay=3, max_delay=15, factor=2, scale=1)
-async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
+def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
     """Запрос постов с телеграмм канала"""
     if times:
         time_point = datetime(datetime.now().year, datetime.now().month, datetime.now().day, times // 60,

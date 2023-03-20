@@ -12,11 +12,11 @@ from threading import Thread
 
 from core import files
 from core.request import *
-from core.telegram import get_posts
+from core.telegram import get_posts, get_posts_rss
 from core.utils import valid_channel, valid_user, remove_tags
 from core import ml
 
-from core.bot import bot
+# from core.bot import bot
 
 app = FastAPI()
 
@@ -26,8 +26,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("telebot").setLevel(logging.WARNING)
 
-bot_thread = Thread(target=bot.infinity_polling)
-bot_thread.start()
+# bot_thread = Thread(target=bot.infinity_polling)
+# bot_thread.start()
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
@@ -57,8 +57,11 @@ async def create_model(user_id: int, channel: str) -> Response:
 
     if not valid_user(user_id):
         return Response('User Not Found', status_code=404)
-
-    posts, status_code = await get_posts(channel, 50, 0)
+    try:
+        posts, status_code = get_posts(channel, 50, 0)
+    except Exception as e:
+        logging.error(e)
+        posts, status_code = get_posts_rss(channel, 50, 0)
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     if status_code == 400:
@@ -145,8 +148,11 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     if not valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
-
-    posts, status_code = await get_posts(channel, 50, request.time)
+    try:
+        posts, status_code = get_posts(channel, 50, request.time)
+    except Exception as e:
+        logging.error(e)
+        posts, status_code = get_posts_rss(channel, 50, 0)
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     dataset = files.load_dataset(user_id, channel)

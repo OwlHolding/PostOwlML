@@ -1,6 +1,4 @@
-import asyncio
 import json
-import os
 import random
 import shutil
 
@@ -18,12 +16,22 @@ channels = ['forbesrussia', 'nn_for_science']
 
 def test_telegram_channels():
     for channel in channels:
-        assert asyncio.run(telegram.get_posts(channel, 10, 0))[1] == 200
+        assert telegram.get_posts(channel, 10, 0)[1] == 200
+
+
+def test_telegram_channels_rss():
+    for channel in channels:
+        assert telegram.get_posts_rss(channel, 10, 0)[1] == 200
 
 
 def test_telegram_count():
-    assert asyncio.run(telegram.get_posts(channels[0], 100, 0))[1] == 200
-    assert asyncio.run(telegram.get_posts(channels[0], 500, 0))[1] == 200
+    assert telegram.get_posts(channels[0], 100, 0)[1] == 200
+    assert telegram.get_posts(channels[0], 500, 0)[1] == 200
+
+
+def test_telegram_count_rss():
+    assert telegram.get_posts_rss(channels[0], 100, 0)[1] == 200
+    assert telegram.get_posts_rss(channels[0], 500, 0)[1] == 200
 
 
 def test_ping():
