@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from threading import Thread
 
@@ -8,6 +9,13 @@ from random_user_agent.user_agent import UserAgent
 
 from core.utils import retry
 
+channel_not_exist = 'If you have Telegram, you can contact '
+
+def channel_is_exist(channel):
+    resp = requests.get(f"https://rsshub.app/telegram/channel/{channel}")
+    if resp.status_code != 200:
+        return False
+    return True
 
 def get_url(url, results, index):
     resp = requests.get(url, headers=get_random_agent())
@@ -45,10 +53,23 @@ def get_random_agent() -> dict:
 
 @retry(times=20, exceptions=IndexError, min_delay=3, max_delay=15, factor=2, scale=1)
 def get_index(channel: str) -> str:
-    first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
-    soup = BeautifulSoup(first_page.text, "html.parser")
-
-    if soup.findAll('div', class_='tgme_page') or soup.findAll('div', class_='footer_telegram_description') or soup.findAll('div', class_='fb-root'):
+    if not channel_is_exist(channel):
+        return "0"
+    for _ in range(3):
+        first_page = requests.get(f'https://t.me/s/{channel}/', headers=get_random_agent())
+        soup = BeautifulSoup(first_page.text, "html.parser")
+        if soup.find('div', class_='footer_telegram_description'):
+            pass
+        elif soup.find('div', class_='tgme_page_description'):
+            if soup.find('div', class_='tgme_page_description').text.startswith(channel_not_exist):
+                pass
+            else:
+                break
+        elif soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap'):
+            break
+        else:
+            break
+    else:
         return "0"
 
     last_post = soup.findAll('div', class_='tgme_widget_message_wrap js-widget_message_wrap')[-1]
@@ -78,15 +99,15 @@ async def get_posts(channel: str, count: int, times: [int, None]) -> [list[str],
     result = download_html(url_list)
 
     for page in result:
-        html = BeautifulSoup(page, "html.parser")
         try:
+            html = BeautifulSoup(page, "html.parser")
             text = ''.join(
                 map(str,
                     html.findAll('div', class_='tgme_widget_message_text js-message_text')[0].contents)).replace(
                 '<br/>', '\n')
             pub_time = datetime.strptime(html.find('time')['datetime'], "%Y-%m-%dT%H:%M:%S%z")
-        except:
-            pass
+        except Exception as e:
+            logging.error(e)
         else:
             if times:
                 if pub_time.timestamp() > time_point.timestamp():

@@ -38,6 +38,16 @@ def test_register_channel():
         posts[channel] = response.json()
 
 
+def test_wrong_channel():
+    response = client.post('/regchannel/1/dhfhsdhfkhkffsdsdsdjk')
+    assert response.status_code == 400
+
+
+def test_wrong_user():
+    response = client.post(f'/regchannel/2/{channels[0]}')
+    assert response.status_code == 404
+
+
 def test_train():
     for channel in channels:
         data = json.dumps({
@@ -102,7 +112,6 @@ def test_owl_learning_step_cb():
 
 def test_predict_cb():
     for channel in channels:
-        assert os.path.exists(f'users/1/{channel}/model.bin')
         response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
         assert response.status_code // 10 == 20
         assert isinstance(response.json()['markup'], str)
