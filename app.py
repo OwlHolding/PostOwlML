@@ -113,7 +113,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
     if request.finetune:
 
-        if (len(dataset[dataset['labels'].notna()]) - 10) % 42 == 0:
+        if (dataset['labels'].notna().sum() - 10) % 42 == 0:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
             ml.finetune(config=config,
                         user_id=user_id,
