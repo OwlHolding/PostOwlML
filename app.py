@@ -113,7 +113,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
     if request.finetune:
 
-        if (dataset['labels'].notna().sum() - 10) % 42 == 0:
+        if (dataset['labels'].notna().sum() - 10) % 6 == 0:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
             ml.finetune(config=config,
                         user_id=user_id,
@@ -200,10 +200,10 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         config['drop'] = True
         logging.info(f"Set 'drop' in config for user {user_id}:{channel}")
 
-    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': [posts[-1]],
-                                                                           'labels': [np.nan],
-                                                                           'confidence': [np.nan],
-                                                                           'timestamp': [datetime.now()]
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[:5],
+                                                                           'labels': [np.nan for _ in range(5)],
+                                                                           'confidence': [np.nan for _ in range(5)],
+                                                                           'timestamp': [datetime.now() for _ in range(5)]
                                                                            })], ignore_index=True))
 
     return JSONResponse(

@@ -86,7 +86,7 @@ def get_finetune_data(channel):
 
 def test_owl_learning_step():
     for channel in channels:
-        for _ in range(42):
+        for _ in range(6):
             response = client.post(f'/train/1/{channel}', data=get_finetune_data(channel))
             assert response.status_code // 10 == 20
             response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
@@ -103,7 +103,7 @@ def test_owl_learning_step_cb():
         dataset = load_dataset(1, channel)
         j = 0
         for i in dataset[dataset['labels'].isna()].index:
-            if (dataset['labels'].notna().sum() - 10) % 42 == 0:
+            if (dataset['labels'].notna().sum() - 10) % 6 == 0:
                 break
             j += 1
             dataset.at[i, 'labels'] = j % 2
