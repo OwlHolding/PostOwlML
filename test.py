@@ -1,5 +1,5 @@
 import json
-import random
+import time
 import shutil
 
 from starlette.testclient import TestClient
@@ -11,7 +11,16 @@ from core.files import save_config, load_config, load_dataset, save_dataset
 client = TestClient(app)
 posts = dict()
 markup = dict()
-channels = ['forbesrussia', 'nn_for_science']
+channels = ['forbesrussia',
+            'postupashki',
+            'airi_research_institute',
+            'ebaresearch',
+            'bloomberg_ru',
+            'RussianHackers_Channel',
+            'BDataScienceM',
+            'gradientdip',
+            'yandex',
+            'nn_for_science']
 
 
 def test_telegram_channels():
@@ -60,7 +69,7 @@ def test_train():
     for channel in channels:
         data = json.dumps({
             'posts': posts[channel]['posts'],
-            'labels': [random.choice([0, 1]) for _ in range(len(posts[channel]['posts']))],
+            'labels': [i % 2 for i in range(len(posts[channel]['posts']))],
             'finetune': False
         })
         response = client.post(f'/train/1/{channel}', data=data)
@@ -126,5 +135,6 @@ def test_predict_cb():
 
 
 def test_remove_dir():
-    shutil.rmtree('users\\1')
+    time.sleep(5)
+    shutil.rmtree('users/1')
     assert True
