@@ -188,7 +188,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             response.append(posts[i])
 
     content = {
-        "posts": [remove_tags(post) for post in response[:5]],
+        "posts": [remove_tags(post) for post in response[-5:]],
         "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
     }
 
@@ -200,10 +200,10 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         config['drop'] = True
         logging.info(f"Set 'drop' in config for user {user_id}:{channel}")
 
-    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[:5],
-                                                                           'labels': [np.nan for _ in range(len(response[:5]))],
-                                                                           'confidence': [np.nan for _ in range(len(response[:5]))],
-                                                                           'timestamp': [datetime.now() for _ in range(len(response[:5]))]
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[-5:],
+                                                                           'labels': [np.nan for _ in range(len(response[-5:]))],
+                                                                           'confidence': [np.nan for _ in range(len(response[-5:]))],
+                                                                           'timestamp': [datetime.now() for _ in range(len(response[-5:]))]
                                                                            })], ignore_index=True))
 
     return JSONResponse(
