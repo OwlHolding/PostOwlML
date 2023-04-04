@@ -6,7 +6,7 @@ from starlette.testclient import TestClient
 
 import core.telegram as telegram
 from app import app
-from core.files import save_config, load_config, load_dataset, save_dataset
+from files import save_config, load_config, load_dataset, save_dataset
 
 client = TestClient(app)
 posts = dict()

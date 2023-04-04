@@ -1,7 +1,3 @@
-from sklearnex import patch_sklearn
-
-patch_sklearn()
-
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -10,28 +6,21 @@ import pandas as pd
 import logging
 from threading import Thread
 
-from core import files
 from core.request import *
 from core.telegram import get_posts, get_posts_rss
-from core.utils import valid_channel, valid_user, remove_tags
-from core import ml
+from core.utils import remove_tags
 
-# from core.bot import bot
+from ml_engine import fit, predict, finetune, get_confidence
+import files
 
 app = FastAPI()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
                     filemode="w")
 
-logging.getLogger("requests").setLevel(logging.WARNING)
-logging.getLogger("telebot").setLevel(logging.WARNING)
-
-# bot_thread = Thread(target=bot.infinity_polling)
-# bot_thread.start()
-
 
 def save_confidence(config, dataset, user_id, channel) -> None:
-    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+    dataset.confidence = get_confidence(config, dataset.posts, user_id, channel)
     files.save_dataset(user_id, channel, dataset)
     logging.info(f"Dataset for user {user_id}:{channel} saved")
 
@@ -44,6 +33,8 @@ async def register(user_id: int) -> Response:
 
     if status_code == 201:
         logging.info(f"Created new user {user_id}")
+    else:
+        logging.info(f"Attempt to register a user {user_id}")
 
     return Response(
         content="",
@@ -55,7 +46,7 @@ async def register(user_id: int) -> Response:
 async def create_model(user_id: int, channel: str) -> Response:
     """Создание модели и обучающей выборки для запрошенного канала."""
 
-    if not valid_user(user_id):
+    if not files.valid_user(user_id):
         return Response('User Not Found', status_code=404)
     try:
         try:
@@ -100,7 +91,7 @@ async def create_model(user_id: int, channel: str) -> Response:
 async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     """Обучение модели"""
 
-    if not valid_channel(user_id, channel):
+    if not files.valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
 
     dataset = files.load_dataset(user_id, channel)
@@ -115,13 +106,13 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         if (dataset['labels'].notna().sum() - 10) % 6 == 0:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
-            ml.finetune(config=config,
-                        user_id=user_id,
-                        channel=channel,
-                        texts_tf_idf=dataset['posts'].tolist(),
-                        labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
-                        texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
-                        )
+            finetune(config=config,
+                     user_id=user_id,
+                     channel=channel,
+                     texts_tf_idf=dataset['posts'].tolist(),
+                     labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
+                     texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
+                     )
 
     else:
 
@@ -130,12 +121,12 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         logging.info(f"Started training model for user {user_id}:{channel}")
 
-        ml.fit(config=config,
-               texts=request.posts,
-               labels=request.labels,
-               user_id=user_id,
-               channel=channel,
-               texts_tf_idf=dataset['posts'].tolist())
+        fit(config=config,
+            texts=request.posts,
+            labels=request.labels,
+            user_id=user_id,
+            channel=channel,
+            texts_tf_idf=dataset['posts'].tolist())
 
         logging.info(f"Model trained for user {user_id}:{channel}")
 
@@ -151,7 +142,7 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 async def predict(user_id: int, channel: str, request: PredictRequest) -> Response:
     """Выбор лучших постов"""
 
-    if not valid_channel(user_id, channel):
+    if not files.valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
     try:
         posts, status_code = get_posts(channel, 50, request.time)
@@ -175,7 +166,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             status_code=200
         )
 
-    output = ml.predict(
+    output = predict(
         config=config,
         texts=posts,
         user_id=user_id,
@@ -203,7 +194,8 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
     files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[:5],
                                                                            'labels': [np.nan for _ in range(5)],
                                                                            'confidence': [np.nan for _ in range(5)],
-                                                                           'timestamp': [datetime.now() for _ in range(5)]
+                                                                           'timestamp': [datetime.now() for _ in
+                                                                                         range(5)]
                                                                            })], ignore_index=True))
 
     return JSONResponse(

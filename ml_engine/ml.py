@@ -1,3 +1,7 @@
+from sklearnex import patch_sklearn
+
+patch_sklearn()
+
 import logging
 import re
 import string
@@ -14,7 +18,7 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 
-from core.files import save_model, load_model
+from files import save_model, load_model
 
 warnings.filterwarnings("ignore")
 

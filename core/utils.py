@@ -1,28 +1,5 @@
-import os
 import time
-
 import numpy as np
-
-tag_list = [
-    "b", "strong", "i", "em", "u", "ins", "s", "strike", "del", "span", "tg-spoiler", "code", "pre", "a", "img"
-]
-
-
-def valid_user(user_id: int) -> bool:
-    """Проверка существования пользователя"""
-    if os.path.exists(f'users/{user_id}/'):
-        return True
-
-    return False
-
-
-def valid_channel(user_id: int, channel: str) -> bool:
-    """Проверка существования пары пользователь канал"""
-
-    if os.path.exists(f'users/{user_id}/{channel}/'):
-        return True
-
-    return False
 
 
 def retry(times: int, exceptions, min_delay: int, max_delay: int, factor=2, scale=1):
