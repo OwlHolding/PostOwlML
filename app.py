@@ -10,7 +10,7 @@ from core.request import *
 from core.telegram import get_posts, get_posts_rss
 from core.utils import remove_tags
 
-from ml_engine import fit, predict, finetune, get_confidence
+import ml
 import files
 
 app = FastAPI()
@@ -20,7 +20,10 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
-    dataset.confidence = get_confidence(config, dataset.posts, user_id, channel)
+
+    model, tfidf = files.load_model(user_id, channel, config)
+
+    dataset.confidence = ml.get_confidence(texts=dataset.posts, model=model, tfidf=tfidf)
     files.save_dataset(user_id, channel, dataset)
     logging.info(f"Dataset for user {user_id}:{channel} saved")
 
@@ -106,13 +109,16 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         if (dataset['labels'].notna().sum() - 10) % 6 == 0:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
-            finetune(config=config,
-                     user_id=user_id,
-                     channel=channel,
-                     texts_tf_idf=dataset['posts'].tolist(),
-                     labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
-                     texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
-                     )
+
+            model, tfidf = ml.finetune(config=config,
+                                    user_id=user_id,
+                                    channel=channel,
+                                    texts_tf_idf=dataset['posts'].tolist(),
+                                    labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
+                                    texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
+                                    )
+
+            files.save_model(user_id, channel, model, tfidf, config)
 
     else:
 
@@ -121,12 +127,12 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         logging.info(f"Started training model for user {user_id}:{channel}")
 
-        fit(config=config,
-            texts=request.posts,
-            labels=request.labels,
-            user_id=user_id,
-            channel=channel,
-            texts_tf_idf=dataset['posts'].tolist())
+        model, tfidf = ml.fit(config=config,
+                           texts=request.posts,
+                           labels=request.labels,
+                           texts_tf_idf=dataset['posts'].tolist())
+
+        files.save_model(user_id, channel, model, tfidf, config)
 
         logging.info(f"Model trained for user {user_id}:{channel}")
 
@@ -166,11 +172,12 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             status_code=200
         )
 
-    output = predict(
-        config=config,
+    model, tfidf = files.load_model(user_id, channel, config)
+
+    output = ml.predict(
         texts=posts,
-        user_id=user_id,
-        channel=channel,
+        model=model,
+        tfidf=tfidf,
     )
 
     response = []
