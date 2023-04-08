@@ -95,7 +95,7 @@ class KeyWords:
         documents = [' '.join(tokenized_text) for tokenized_text in tokenized_documents]
         return documents
 
-    def get_tfifd(self, documents: list) -> TfidfVectorizer:
+    def get_tfidf(self, documents: list) -> TfidfVectorizer:
         clean_documents = self.preprocessing(documents)
 
         tf_idf_vectorizer = TfidfVectorizer(max_features=5000)
@@ -120,7 +120,7 @@ def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], 
     """Инициализирует и учит модель"""
 
     feature_extractor = KeyWords(language)
-    tfidf = feature_extractor.get_tfifd(texts_tf_idf)
+    tfidf = feature_extractor.get_tfidf(texts_tf_idf)
 
     model = SVC(probability=True)
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
@@ -143,7 +143,7 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
     """Дообучает модель на новых данных"""
 
     feature_extractor = KeyWords(language)
-    tfidf = feature_extractor.get_tfifd(texts_tf_idf)
+    tfidf = feature_extractor.get_tfidf(texts_tf_idf)
     x = tfidf.transform(feature_extractor.preprocessing(texts)).toarray()
 
     if config['model'] != 'CatBoost':

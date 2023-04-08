@@ -77,6 +77,8 @@ async def create_model(user_id: int, channel: str) -> Response:
     if status_code == 201:
         logging.info(f"Successfully registered a new channel for {user_id}:{channel}")
 
+    posts = list(map(remove_tags, posts))
+
     df = files.load_dataset(user_id, channel)
     files.save_dataset(user_id, channel, pd.concat([df, pd.DataFrame({'posts': posts,
                                                                       'labels': [np.nan for _ in range(len(posts))],
@@ -87,7 +89,7 @@ async def create_model(user_id: int, channel: str) -> Response:
     logging.info(f"The dataset for {user_id}:{channel} has been updated")
 
     content = {
-        'posts': [remove_tags(post) for post in posts[:10]]
+        'posts': posts[:10]
     }
 
     return JSONResponse(
@@ -160,6 +162,8 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         posts, status_code = get_posts_rss(channel, 50, 0)
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
+    posts = list(map(remove_tags, posts))
+
     dataset = files.load_dataset(user_id, channel)
     config = files.load_config(user_id, channel)
 
@@ -184,12 +188,12 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     response = []
     for i in range(len(posts)):
-        if output[i] == 1:
+        if output[i] == 1 and dataset.posts.isin([posts[i]]).sum() == 0:
             response.append(posts[i])
 
     content = {
-        "posts": [remove_tags(post) for post in response[-5:]],
-        "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
+        "posts": response[-5:],
+        "markup": dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts,
     }
 
     if config['drop']:
@@ -200,11 +204,12 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         config['drop'] = True
         logging.info(f"Set 'drop' in config for user {user_id}:{channel}")
 
-    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[-5:],
-                                                                           'labels': [np.nan for _ in range(len(response[-5:]))],
-                                                                           'confidence': [np.nan for _ in range(len(response[-5:]))],
-                                                                           'timestamp': [datetime.now() for _ in range(len(response[-5:]))]
-                                                                           })], ignore_index=True))
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({
+        'posts': response[-5:],
+        'labels': [np.nan for _ in range(len(response[-5:]))],
+        'confidence': [np.nan for _ in range(len(response[-5:]))],
+        'timestamp': [datetime.now() for _ in range(len(response[-5:]))]
+    })], ignore_index=True))
 
     return JSONResponse(
         content=content,
