@@ -130,7 +130,7 @@ def get_posts(channel: str, count: int, times: [int, None]) -> [list[str], int]:
                 '<br/>', '\n')
             pub_time = datetime.strptime(html.find('time')['datetime'], "%Y-%m-%dT%H:%M:%S%z")
         except Exception as e:
-            logging.error(e)
+            logging.info(f'Retry {e}')
         else:
             if times:
                 if pub_time.timestamp() > time_point.timestamp():

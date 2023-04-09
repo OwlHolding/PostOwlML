@@ -82,7 +82,7 @@ def test_predict():
         markup[channel] = [response.json()['markup']]
         assert response.status_code // 10 == 20
         assert isinstance(response.json()['markup'], str)
-        assert response.json()['posts']
+        assert isinstance(response.json()['posts'], list)
 
 
 def get_finetune_data(channel):
@@ -131,7 +131,7 @@ def test_predict_cb():
         response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
         assert response.status_code // 10 == 20
         assert isinstance(response.json()['markup'], str)
-        assert response.json()['posts']
+        assert isinstance(response.json()['posts'], list)
 
 
 def test_remove_dir():

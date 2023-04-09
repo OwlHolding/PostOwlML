@@ -61,10 +61,10 @@ async def create_model(user_id: int, channel: str) -> Response:
         try:
             posts, status_code = get_posts(channel, 50, 0)
         except Exception as e:
-            logging.error(e)
+            logging.info('Retry with rss')
             posts, status_code = get_posts_rss(channel, 50, 0)
     except Exception as e:
-        logging.error(e)
+        logging.info('Unsupported channel')
         return Response('Unsupported channel', status_code=400)
 
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
@@ -156,7 +156,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
     try:
         posts, status_code = get_posts(channel, 50, request.time)
     except Exception as e:
-        logging.error(e)
+        logging.info('Retry with rss')
         posts, status_code = get_posts_rss(channel, 50, 0)
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
