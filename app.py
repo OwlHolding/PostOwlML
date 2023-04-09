@@ -193,7 +193,7 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     content = {
         "posts": response[-5:],
-        "markup": dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts,
+        "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
     }
 
     if config['drop']:
