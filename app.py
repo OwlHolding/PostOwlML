@@ -186,11 +186,17 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
     for i in range(len(posts)):
         if output[i] == 1:
             response.append(posts[i])
-
-    content = {
-        "posts": [remove_tags(post) for post in response[-5:]],
-        "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
-    }
+    try:
+        content = {
+            "posts": [remove_tags(post) for post in response[-5:]],
+            "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
+        }
+    except Exception as e:
+        logging.warning(f'for {user_id}:{channel} dataset is empty')
+        content = {
+            "posts": [remove_tags(post) for post in response[-5:]],
+            "markup": ''
+        }
 
     if config['drop']:
         dataset = dataset.sort_values(by="timestamp").drop(index=0)
