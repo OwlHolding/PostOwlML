@@ -7,7 +7,7 @@ import logging
 from threading import Thread
 
 from core.request import *
-from core.telegram import get_posts, get_posts_rss
+from core.telegram import get_posts
 from core.utils import remove_tags
 
 import ml
@@ -20,7 +20,6 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
 
 
 def save_confidence(config, dataset, user_id, channel) -> None:
-
     model, tfidf = files.load_model(user_id, channel, config)
 
     dataset.confidence = ml.get_confidence(texts=dataset.posts, model=model, tfidf=tfidf)
@@ -52,11 +51,8 @@ async def create_model(user_id: int, channel: str) -> Response:
     if not files.valid_user(user_id):
         return Response('User Not Found', status_code=404)
     try:
-        try:
-            posts, status_code = get_posts(channel, 50, 0)
-        except Exception as e:
-            logging.error(e)
-            posts, status_code = get_posts_rss(channel, 50, 0)
+        posts, status_code = get_posts(channel, 50, 0)
+
     except Exception as e:
         logging.error(e)
         return Response('Unsupported channel', status_code=400)
@@ -111,12 +107,12 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
 
             model, tfidf = ml.finetune(config=config,
-                                    user_id=user_id,
-                                    channel=channel,
-                                    texts_tf_idf=dataset['posts'].tolist(),
-                                    labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
-                                    texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
-                                    )
+                                       user_id=user_id,
+                                       channel=channel,
+                                       texts_tf_idf=dataset['posts'].tolist(),
+                                       labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
+                                       texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
+                                       )
 
             files.save_model(user_id, channel, model, tfidf, config)
 
@@ -128,9 +124,9 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
         logging.info(f"Started training model for user {user_id}:{channel}")
 
         model, tfidf = ml.fit(config=config,
-                           texts=request.posts,
-                           labels=request.labels,
-                           texts_tf_idf=dataset['posts'].tolist())
+                              texts=request.posts,
+                              labels=request.labels,
+                              texts_tf_idf=dataset['posts'].tolist())
 
         files.save_model(user_id, channel, model, tfidf, config)
 
@@ -150,11 +146,8 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
 
     if not files.valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
-    try:
-        posts, status_code = get_posts(channel, 50, request.time)
-    except Exception as e:
-        logging.error(e)
-        posts, status_code = get_posts_rss(channel, 50, 0)
+
+    posts, status_code = get_posts(channel, 50, request.time)
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     dataset = files.load_dataset(user_id, channel)
