@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
                     filemode="w")
 
 
-def save_confidence(config, dataset, user_id, channel) -> None:
+def save_confidence(config: dict, dataset: pd.DataFrame, user_id: int, channel: str) -> None:
     model, tfidf = files.load_model(user_id, channel, config)
 
     dataset.confidence = ml.get_confidence(texts=dataset.posts, model=model, tfidf=tfidf)
@@ -136,6 +136,8 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
     tr = Thread(target=save_confidence, args=[config, dataset, user_id, channel])
     tr.start()
+
+    files.save_dataset(dataset=dataset, user_id=user_id, channel=channel)
 
     return Response(status_code=202)
 
