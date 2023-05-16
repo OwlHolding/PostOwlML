@@ -193,11 +193,10 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         config['drop'] = True
         logging.info(f"Set 'drop' in config for user {user_id}:{channel}")
 
-    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[:5],
-                                                                           'labels': [np.nan for _ in range(5)],
-                                                                           'confidence': [np.nan for _ in range(5)],
-                                                                           'timestamp': [datetime.now() for _ in
-                                                                                         range(5)]
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': [i for i in response[:5]],
+                                                                           'labels': [np.nan for _ in response[:5]],
+                                                                           'confidence': [np.nan for _ in response[:5]],
+                                                                           'timestamp': [datetime.now() for _ in response[:5]]
                                                                            })], ignore_index=True))
 
     return JSONResponse(
