@@ -1,28 +1,5 @@
-import time
-import numpy as np
 from random_user_agent.params import SoftwareName, OperatingSystem
 from random_user_agent.user_agent import UserAgent
-
-def retry(times: int, exceptions, min_delay: int, max_delay: int, factor=2, scale=1):
-    """Декоратор для повторения функции"""
-
-    def decorator(func):
-        def newfn(*args, **kwargs):
-            attempt = 0
-            delay = min_delay
-            while attempt < times:
-                try:
-                    return func(*args, **kwargs)
-                except exceptions:
-                    time.sleep(delay)
-                    delay = min(delay * factor, max_delay)
-                    delay = np.random.normal(delay, scale=scale)
-                    attempt += 1
-            return func(*args, **kwargs)
-
-        return newfn
-
-    return decorator
 
 
 def remove_tags(text: str) -> str:

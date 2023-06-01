@@ -132,8 +132,7 @@ dmypy.json
 .idea/
 .idea/*
 
-users
-users/*
+
 catboost_info
 catboost_info/*
 log.txt
