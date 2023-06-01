@@ -10,28 +10,23 @@ import pandas as pd
 import logging
 from threading import Thread
 
-from core import files
 from core.request import *
-from core.telegram import get_posts, get_posts_rss
-from core.utils import valid_channel, valid_user, remove_tags
-from core import ml
+from core.telegram import get_posts
+from core.utils import remove_tags
 
-# from core.bot import bot
+import ml
+import files
 
 app = FastAPI()
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
                     filemode="w")
 
-logging.getLogger("requests").setLevel(logging.WARNING)
-logging.getLogger("telebot").setLevel(logging.WARNING)
 
-# bot_thread = Thread(target=bot.infinity_polling)
-# bot_thread.start()
+def save_confidence(config: dict, dataset: pd.DataFrame, user_id: int, channel: str) -> None:
+    model, tfidf = files.load_model(user_id, channel, config)
 
-
-def save_confidence(config, dataset, user_id, channel) -> None:
-    dataset.confidence = ml.get_confidence(config, dataset.posts, user_id, channel)
+    dataset.confidence = ml.get_confidence(texts=dataset.posts, model=model, tfidf=tfidf)
     files.save_dataset(user_id, channel, dataset)
     logging.info(f"Dataset for user {user_id}:{channel} saved")
 
@@ -44,6 +39,8 @@ async def register(user_id: int) -> Response:
 
     if status_code == 201:
         logging.info(f"Created new user {user_id}")
+    else:
+        logging.info(f"Attempt to register a user {user_id}")
 
     return Response(
         content="",
@@ -55,14 +52,11 @@ async def register(user_id: int) -> Response:
 async def create_model(user_id: int, channel: str) -> Response:
     """Создание модели и обучающей выборки для запрошенного канала."""
 
-    if not valid_user(user_id):
+    if not files.valid_user(user_id):
         return Response('User Not Found', status_code=404)
     try:
-        try:
-            posts, status_code = get_posts(channel, 50, 0)
-        except Exception as e:
-            logging.info('Retry with rss')
-            posts, status_code = get_posts_rss(channel, 50, 0)
+        posts, status_code = get_posts(channel, 50, 0)
+
     except Exception as e:
         logging.info('Unsupported channel')
         return Response('Unsupported channel', status_code=400)
@@ -100,7 +94,7 @@ async def create_model(user_id: int, channel: str) -> Response:
 async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     """Обучение модели"""
 
-    if not valid_channel(user_id, channel):
+    if not files.valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
 
     dataset = files.load_dataset(user_id, channel)
@@ -115,13 +109,16 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         if (dataset['labels'].notna().sum() - 10) % 6 == 0:
             logging.info(f"Started Owl Learning step for user {user_id}:{channel}")
-            ml.finetune(config=config,
-                        user_id=user_id,
-                        channel=channel,
-                        texts_tf_idf=dataset['posts'].tolist(),
-                        labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
-                        texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
-                        )
+
+            model, tfidf = ml.finetune(config=config,
+                                       user_id=user_id,
+                                       channel=channel,
+                                       texts_tf_idf=dataset['posts'].tolist(),
+                                       labels=dataset[dataset['labels'].notna()]['labels'].tolist(),
+                                       texts=dataset.loc[dataset['labels'].notna(), 'posts'].tolist()
+                                       )
+
+            files.save_model(user_id, channel, model, tfidf, config)
 
     else:
 
@@ -130,12 +127,12 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 
         logging.info(f"Started training model for user {user_id}:{channel}")
 
-        ml.fit(config=config,
-               texts=request.posts,
-               labels=request.labels,
-               user_id=user_id,
-               channel=channel,
-               texts_tf_idf=dataset['posts'].tolist())
+        model, tfidf = ml.fit(config=config,
+                              texts=request.posts,
+                              labels=request.labels,
+                              texts_tf_idf=dataset['posts'].tolist())
+
+        files.save_model(user_id, channel, model, tfidf, config)
 
         logging.info(f"Model trained for user {user_id}:{channel}")
 
@@ -144,6 +141,8 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
     tr = Thread(target=save_confidence, args=[config, dataset, user_id, channel])
     tr.start()
 
+    files.save_dataset(dataset=dataset, user_id=user_id, channel=channel)
+
     return Response(status_code=202)
 
 
@@ -151,13 +150,10 @@ async def train(user_id: int, channel: str, request: TrainRequest) -> Response:
 async def predict(user_id: int, channel: str, request: PredictRequest) -> Response:
     """Выбор лучших постов"""
 
-    if not valid_channel(user_id, channel):
+    if not files.valid_channel(user_id, channel):
         return Response('User Not Found', status_code=404)
-    try:
-        posts, status_code = get_posts(channel, 50, request.time)
-    except Exception as e:
-        logging.info('Retry with rss')
-        posts, status_code = get_posts_rss(channel, 50, 0)
+
+    posts, status_code = get_posts(channel, 50, request.time)
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")
 
     dataset = files.load_dataset(user_id, channel)
@@ -175,28 +171,23 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
             status_code=200
         )
 
+    model, tfidf = files.load_model(user_id, channel, config)
+
     output = ml.predict(
-        config=config,
         texts=posts,
-        user_id=user_id,
-        channel=channel,
+        model=model,
+        tfidf=tfidf,
     )
 
     response = []
     for i in range(len(posts)):
         if output[i] == 1:
             response.append(posts[i])
-    try:
-        content = {
-            "posts": [remove_tags(post) for post in response[-5:]],
-            "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
-        }
-    except Exception as e:
-        logging.warning(f'for {user_id}:{channel} dataset is empty')
-        content = {
-            "posts": [remove_tags(post) for post in response[-5:]],
-            "markup": ''
-        }
+
+    content = {
+        "posts": [remove_tags(post) for post in response[:5]],
+        "markup": remove_tags(dataset[dataset.labels.isna()].sort_values(by="confidence").iloc[0].posts),
+    }
 
     if config['drop']:
         dataset = dataset.sort_values(by="timestamp").drop(index=0)
@@ -206,10 +197,10 @@ async def predict(user_id: int, channel: str, request: PredictRequest) -> Respon
         config['drop'] = True
         logging.info(f"Set 'drop' in config for user {user_id}:{channel}")
 
-    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': response[-5:],
-                                                                           'labels': [np.nan for _ in range(len(response[-5:]))],
-                                                                           'confidence': [np.nan for _ in range(len(response[-5:]))],
-                                                                           'timestamp': [datetime.now() for _ in range(len(response[-5:]))]
+    files.save_dataset(user_id, channel, pd.concat([dataset, pd.DataFrame({'posts': [i for i in response[:5]],
+                                                                           'labels': [np.nan for _ in response[:5]],
+                                                                           'confidence': [np.nan for _ in response[:5]],
+                                                                           'timestamp': [datetime.now() for _ in response[:5]]
                                                                            })], ignore_index=True))
 
     return JSONResponse(

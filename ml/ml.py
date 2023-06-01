@@ -1,3 +1,7 @@
+from sklearnex import patch_sklearn
+
+patch_sklearn()
+
 import logging
 import re
 import string
@@ -14,7 +18,6 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 
-from core.files import save_model, load_model
 
 warnings.filterwarnings("ignore")
 
@@ -104,19 +107,15 @@ class KeyWords:
         return tf_idf_vectorizer
 
 
-def get_confidence(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') \
-        -> list[float]:
+def get_confidence(texts: list[str], model, tfidf, language='russian') -> list[float]:
     feature_extractor = KeyWords(language)
-
-    model, tfidf = load_model(user_id, channel, config)
 
     prediction = model.predict_proba(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
     return [(abs(i[0] - 0.5) + abs(i[1] - 0.5)) / 2 for i in prediction]
 
 
-def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], channel: str,
-        texts_tf_idf: list[str], language='russian') -> None:
+def fit(config: dict, texts: list[str], labels: list[int], texts_tf_idf: list[str], language='russian'):
     """Инициализирует и учит модель"""
 
     feature_extractor = KeyWords(language)
@@ -125,21 +124,19 @@ def fit(config: dict, texts: list[str], labels: list[int], user_id: [int, str], 
     model = SVC(probability=True)
     model.fit(tfidf.transform(feature_extractor.preprocessing(texts)).toarray(), labels)
 
-    save_model(user_id, channel, model, tfidf, config)
+    return model, tfidf
 
 
-def predict(config: dict, texts: list[str], user_id: [int, str], channel: str, language='russian') -> list:
+def predict(texts: list[str], model, tfidf, language='russian') -> list:
     """Вызывает модель для выбора лучших постов из texts"""
 
     feature_extractor = KeyWords(language)
-
-    model, tfidf = load_model(user_id, channel, config)
 
     return model.predict(tfidf.transform(feature_extractor.preprocessing(texts)).toarray()).tolist()
 
 
 def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: list[str], user_id: [int, str],
-             channel: str, language='russian') -> None:
+             channel: str, language='russian'):
     """Дообучает модель на новых данных"""
 
     feature_extractor = KeyWords(language)
@@ -165,13 +162,17 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
             config['model'] = 'CatBoost'
             model = CatBoostClassifier(verbose=0)
             model.fit(x, labels)
-            save_model(user_id, channel, model, tfidf, config)
+
+            return model, tfidf
+
         else:
             model = SVC(probability=True)
             model.fit(x, labels)
-            save_model(user_id, channel, model, tfidf, config)
+
+            return model, tfidf
 
     else:
         model = CatBoostClassifier(verbose=0)
         model.fit(x, labels)
-        save_model(user_id, channel, model, tfidf, config)
+
+        return model, tfidf
