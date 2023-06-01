@@ -1,3 +1,7 @@
+from sklearnex import patch_sklearn
+
+patch_sklearn()
+
 from fastapi import FastAPI, Response
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -54,7 +58,7 @@ async def create_model(user_id: int, channel: str) -> Response:
         posts, status_code = get_posts(channel, 50, 0)
 
     except Exception as e:
-        logging.error(e)
+        logging.info('Unsupported channel')
         return Response('Unsupported channel', status_code=400)
 
     logging.info(f"Successfully received {len(posts)} posts from the channel {channel}")

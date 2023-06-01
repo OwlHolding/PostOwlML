@@ -155,7 +155,7 @@ def finetune(config: dict, texts: list[str], labels: list[int], texts_tf_idf: li
         cb_f1 = f1_score(y_test, model_2.predict(x_test))
 
         logging.info(
-            f'Dataset size: {len(texts)}\n\tCatboost f1: {cb_f1}\n\tSVM f1: {svm_f1} for user {user_id}:{channel}')
+            f'\tDataset size: {len(texts)}\n\tCatboost f1: {cb_f1}\n\tSVM f1: {svm_f1} for user {user_id}:{channel}')
 
         if cb_f1 > svm_f1:
             logging.info(f"Set model CatBoost for user {user_id}:{channel}")
