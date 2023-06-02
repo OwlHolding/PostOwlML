@@ -71,21 +71,21 @@
 
 ## Predict
 
-### GET <http://$url/predict/$user-id/>
+### GET <http://$url/predict/>
 
 Запрос:
 ```json
 {
-  "channels": ["test-channel"],
-  "count": 10,
-  "time": 1
+  "post": "post text",
+  "channel": "post channel",
+  "users": [1, 2, 3, 4]
 }
 ```
 
 Ответ:
 ```json
 {
-  "feed": ["first-text", "second-text"]
+  "users": [1, 3]
 }
 ```
 

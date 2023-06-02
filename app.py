@@ -4,7 +4,6 @@ from fastapi.responses import JSONResponse
 import logging
 
 import ml
-import telegram
 from schemes import *
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
@@ -49,18 +48,17 @@ async def del_channel(user_id: int, channel: str) -> Response:
     return Response(status_code=status_code)
 
 
-@app.post("/predict/{user_id}/")
-async def predict(user_id: int, request: PredictRequest) -> Response:
-    post = telegram.get_posts(request.channels, request.count, request.time)
+@app.post("/predict/")
+async def predict(request: PredictRequest) -> Response:
 
-    feed = ml.predict(user_id, ml.PredictedData(post)).get_feed()
+    users = ml.predict(request.post, request.channel, request.users)
 
-    logging.info(f"{user_id} the feed was created successfully - 202")
-    logging.debug(f"Feed Len: {len(feed)}")
+    logging.info(f"predict request for channel {request.channel} - 202")
+    logging.debug(f"{request.users} -> {users}")
 
     return JSONResponse(
         content={
-            "feed": [telegram.remove_tags(text) for text in feed]
+            "users": users
         },
         status_code=202
     )

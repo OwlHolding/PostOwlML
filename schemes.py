@@ -2,9 +2,9 @@ from pydantic import BaseModel
 
 
 class PredictRequest(BaseModel):
-    channels: list
-    count: int
-    time: int
+    post: str
+    channel: str
+    users: list[int]
 
 
 class TrainRequest(BaseModel):
