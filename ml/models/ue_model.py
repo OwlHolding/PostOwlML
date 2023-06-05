@@ -26,6 +26,7 @@ class UserEmbeddingModel(nn.Module):
                 old_user_embedding = None
             else:
                 user_embedding = self.gru(item_embedding, user_embedding)
+            return user_embedding
 
     def init_hidden(self, batch_size):
         weight = next(self.parameters()).data
