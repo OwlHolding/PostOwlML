@@ -6,4 +6,7 @@ bs4~=0.0.1
 beautifulsoup4~=4.12.2
 pydantic~=1.10.8
 starlette~=0.27.0
+torch~=2.0.1
+torchvision~=0.15.2
+torchaudio~=2.0.2
 httpx~=0.24.1
