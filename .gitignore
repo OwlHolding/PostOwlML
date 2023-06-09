@@ -136,3 +136,6 @@ dmypy.json
 catboost_info
 catboost_info/*
 log.txt
+
+ml/datasets/MIND
+ml/datasets/MIND/*

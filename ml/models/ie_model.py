@@ -3,23 +3,51 @@ from torch import nn
 
 
 class ItemEmbeddingModel(nn.Module):
-    def __init__(self, encoder, encoder_size, embedding_size, intermediate_sizes):
+    def __init__(self, encoder_size, embedding_size, intermediate_sizes, text_encoder=None, image_encoder=None, video_encoder=None, audio_encoder=None):
         super().__init__()
-        self.encoder = encoder
+        self.text_encoder = text_encoder
+        self.image_encoder = image_encoder
+        self.video_encoder = video_encoder    # not implemented
+        self.audio_encoder = audio_encoder    # not implemented
         self.encoder_size = encoder_size
         self.intermediate_sizes = intermediate_sizes
         self.embedding_size = embedding_size
         mlp_activations = [nn.LeakyReLU for _ in range(len(self.intermediate_sizes))]
         encoder_dim = self.intermediate_sizes + [self.embedding_size]
         self.mlp = nn.Sequential(*self._spec2seq(
-            self.input_size,
+            self.encoder_size,
             encoder_dim,
             mlp_activations))
 
-    def forward(self, input_ids, attention_mask):
-        item_universal_embedding = self.encoder(input_ids, attention_mask)
-        item_universal_embedding = self.mean_pooling(item_universal_embedding)
-        item_universal_embedding = self.mlp(item_universal_embedding)
+    def forward(self, x, content_type='text'):
+        if content_type == 'text':
+            attention_mask = x['attention_mask']
+            item_universal_embedding = self.text_encoder(**x).last_hidden_state
+            item_universal_embedding = self.mean_pooling(item_universal_embedding, attention_mask)
+            item_universal_embedding = self.mlp(item_universal_embedding)
+        elif content_type == 'image':
+            item_universal_embedding = self.image_encoder(**x).last_hidden_state
+            item_universal_embedding = self.mean_pooling(
+                item_universal_embedding,
+                torch.ones(item_universal_embedding.size()[:-1])
+            )
+            item_universal_embedding = self.mlp(item_universal_embedding)
+        elif content_type == 'audio':
+            item_universal_embedding = self.audio_encoder(**x).last_hidden_state
+            item_universal_embedding = self.mean_pooling(
+                item_universal_embedding,
+                torch.ones(item_universal_embedding.size()[:-1])
+            )
+            item_universal_embedding = self.mlp(item_universal_embedding)
+        elif content_type == 'video':
+            item_universal_embedding = self.video_encoder(**x).last_hidden_state
+            item_universal_embedding = self.mean_pooling(
+                item_universal_embedding,
+                torch.ones(item_universal_embedding.size()[:-1])
+            )
+            item_universal_embedding = self.mlp(item_universal_embedding)
+        else:
+            raise ValueError
         return item_universal_embedding
 
     @staticmethod
