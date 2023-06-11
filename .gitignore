@@ -137,5 +137,8 @@ catboost_info
 catboost_info/*
 log.txt
 
+ml/wandb
+ml/wandb/*
+
 ml/datasets/MIND
 ml/datasets/MIND/*
