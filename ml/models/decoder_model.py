@@ -8,4 +8,7 @@ class Decoder(nn.Module):
         super().__init__()
 
     def forward(self, user_embedding, item_embedding):
-        return F.softmax(torch.matmul(user_embedding, item_embedding.T), dim=-1)
+        res = []
+        for u_e, i_e in zip(user_embedding, item_embedding):
+            res.append(F.softmax(torch.matmul(u_e, i_e.T,), dim=-1))
+        return res

@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 
@@ -12,13 +13,14 @@ class UserEmbeddingModel(nn.Module):
             input_size=self.gru_input_size,
             hidden_size=self.gru_hidden_size,
             num_layers=self.gru_num_layers,
-            dropout=self.dropout
+            # dropout=self.dropout,
+            batch_first=True
         )
 
-    def forward(self, item_embedding_list, user_embedding=None):
-        for item_embedding in item_embedding_list:
-            if user_embedding is None:
-                output, user_embedding = self.gru(item_embedding)
-            else:
-                output, user_embedding = self.gru(item_embedding, user_embedding)
-        return user_embedding[-1,:]
+    def forward(self, item_embeddings, user_embedding=None):
+        if user_embedding is None:
+            output, user_embedding = self.gru(item_embeddings)
+        else:
+            output, user_embedding = self.gru(item_embeddings, user_embedding)
+
+        return user_embedding

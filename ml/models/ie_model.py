@@ -3,13 +3,8 @@ from torch import nn
 
 
 class ItemEmbeddingModel(nn.Module):
-    def __init__(self, encoder_size, embedding_size, intermediate_sizes, device, dropout_rate=0.2, text_encoder=None, image_encoder=None, video_encoder=None, audio_encoder=None):
+    def __init__(self, encoder_size, embedding_size, intermediate_sizes, dropout_rate=0.2):
         super().__init__()
-        self.device = device
-        self.text_encoder = text_encoder
-        self.image_encoder = image_encoder
-        self.video_encoder = video_encoder    # not implemented
-        self.audio_encoder = audio_encoder    # not implemented
         self.dropout_rate = dropout_rate
         self.encoder_size = encoder_size
         self.intermediate_sizes = intermediate_sizes
@@ -22,48 +17,11 @@ class ItemEmbeddingModel(nn.Module):
             mlp_activations))
         self.dropout = nn.Dropout(self.dropout_rate)
 
-    def forward(self, x, content_type='text'):
-        if content_type == 'text':
-            attention_mask, input_ids = x['attention_mask'], x['input_ids']
-            attention_mask = attention_mask.to(self.device)
-            input_ids = input_ids.to(self.device)
-            item_universal_embedding = self.text_encoder(attention_mask= attention_mask, input_ids=input_ids).last_hidden_state
-            item_universal_embedding = self.mean_pooling(item_universal_embedding, attention_mask)
-            item_universal_embedding = self.mlp(item_universal_embedding)
-        elif content_type == 'image':
-            pixel_values = x['pixel_values']
-            pixel_values = pixel_values.to(self.device)
-            item_universal_embedding = self.image_encoder(pixel_values).last_hidden_state
-            item_universal_embedding = self.mean_pooling(
-                item_universal_embedding,
-                torch.ones(item_universal_embedding.size()[:-1]).to(self.device)
-            )
-            item_universal_embedding = self.mlp(item_universal_embedding)
-        elif content_type == 'audio':
-            item_universal_embedding = self.audio_encoder(**x).last_hidden_state
-            item_universal_embedding = self.mean_pooling(
-                item_universal_embedding,
-                torch.ones(item_universal_embedding.size()[:-1]).to(self.device)
-            )
-            item_universal_embedding = self.mlp(item_universal_embedding)
-        elif content_type == 'video':
-            item_universal_embedding = self.video_encoder(**x).last_hidden_state
-            item_universal_embedding = self.mean_pooling(
-                item_universal_embedding,
-                torch.ones(item_universal_embedding.size()[:-1]).to(self.device)
-            )
-            item_universal_embedding = self.mlp(item_universal_embedding)
-        else:
-            raise ValueError
+    def forward(self, embedding):
+        item_universal_embedding = self.mlp(embedding)
         item_universal_embedding = self.dropout(item_universal_embedding)
         return item_universal_embedding
 
-    @staticmethod
-    def mean_pooling(last_hidden_state, attention_mask):
-        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        return sum_embeddings / sum_mask
 
     @staticmethod
     def _spec2seq(input_, dimensions, activations):
