@@ -140,5 +140,7 @@ log.txt
 ml/wandb
 ml/wandb/*
 
+ml/checkpoints/*
+
 ml/datasets/MIND
 ml/datasets/MIND/*

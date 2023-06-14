@@ -13,7 +13,7 @@ class UserEmbeddingModel(nn.Module):
             input_size=self.gru_input_size,
             hidden_size=self.gru_hidden_size,
             num_layers=self.gru_num_layers,
-            # dropout=self.dropout,
+            dropout=self.dropout,
             batch_first=True
         )
 
@@ -23,4 +23,4 @@ class UserEmbeddingModel(nn.Module):
         else:
             output, user_embedding = self.gru(item_embeddings, user_embedding)
 
-        return user_embedding
+        return user_embedding[-1, :, :]

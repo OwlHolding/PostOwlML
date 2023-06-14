@@ -6,16 +6,18 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-from transformers import AutoImageProcessor, Data2VecVisionModel
+from transformers import AutoImageProcessor, Data2VecVisionModel, AutoTokenizer, CLIPImageProcessor, CLIPVisionModel
 from transformers import RobertaTokenizer, Data2VecTextModel
-
+from sentence_transformers import SentenceTransformer
 from utils import get_label, get_id, mean_pooling, Identity
+import requests
 
 
 class PreprocessingDataset(Dataset):
-    def __init__(self, news, content='Text', images_folder=None, image_preprocessor=None, tokenizer=None):
+    def __init__(self, news, content='Text', model=None, images_folder=None, image_preprocessor=None, tokenizer=None):
         super().__init__()
         self.news = news
+        self.model = model
         self.images_folder = images_folder
         self.content = content
         self.image_preprocessor = image_preprocessor
@@ -34,18 +36,25 @@ class PreprocessingDataset(Dataset):
         if self.content == 'Text':
             return self.text['input_ids'][idx], self.text['attention_mask'][idx]
         elif self.content == 'Image':
-            try:
-                return self.image_preprocessor(Image.open(self.images_folder / f'{self.news["NewsID"][idx]}.jpg'),
-                                               return_tensors="pt")['pixel_values']
-            except Exception as e:
-                return self.image_preprocessor(
-                    Image.open(self.images_folder / f'{self.news["NewsID"][idx]}.jpg').convert('RGB'),
-                    return_tensors="pt")['pixel_values']
+            if self.model is None:
+                try:
+                    return self.image_preprocessor(Image.open(self.images_folder / f'{self.news["NewsID"][idx]}.jpg'),
+                                                   return_tensors="pt")['pixel_values']
+                except Exception as e:
+                    return self.image_preprocessor(
+                        Image.open(self.images_folder / f'{self.news["NewsID"][idx]}.jpg').convert('RGB'),
+                        return_tensors="pt")['pixel_values']
+            else:
+                return self.images_folder / f'{self.news["NewsID"][idx]}.jpg'
         else:
             raise ValueError
 
     def __len__(self):
         return len(self.news)
+
+    @staticmethod
+    def load_image(url_or_path):
+        return Image.open(url_or_path)
 
 
 def batch_collate_text(batch):
@@ -154,6 +163,64 @@ def get_embedding_from_image(batch_size, images_folder, path='datasets/MIND/news
     news.to_feather(path)
 
 
+def get_clip_embedding_from_text(batch_size, path='datasets/MIND/news_train.feather'):
+    news = pd.read_feather(path)
+    text_encoder = SentenceTransformer('sentence-transformers/clip-ViT-B-32-multilingual-v1')
+    print('\n' * 10)
+    dataset = PreprocessingDataset(
+        news,
+        content='Text',
+        tokenizer=AutoTokenizer.from_pretrained('sentence-transformers/clip-ViT-B-32-multilingual-v1')
+    )
+    loader = DataLoader(dataset, batch_size=batch_size, collate_fn=batch_collate_text)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    text_encoder.to(device)
+    embs = []
+    with tqdm(total=len(loader)) as progress_bar:
+        for batch in loader:
+            input_ids, attention_mask = batch
+            emb = text_encoder({'input_ids': input_ids.to(device),
+                                'attention_mask': attention_mask.to(device)})[
+                'sentence_embedding'].cpu().detach().numpy()
+            embs.append(emb)
+            progress_bar.update()
+    embs = np.concatenate(embs, axis=0)
+    res = []
+    with tqdm(total=len(embs)) as progress_bar:
+        for emb in embs:
+            res.append(emb)
+            progress_bar.update()
+    news['TextEmbedding'] = res
+    news.to_feather(path)
+
+
+def get_clip_embedding_from_image(images_folder, path='datasets/MIND/news_train.feather'):
+    news = pd.read_feather(path)
+    image_encoder = SentenceTransformer('clip-ViT-B-32')
+    dataset = PreprocessingDataset(
+        news,
+        content='Image',
+        images_folder=images_folder,
+        model='clip',
+        image_preprocessor=None
+    )
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    image_encoder.to(device)
+    res = []
+    embs = []
+    print('\n' * 10)
+    for i in range(len(dataset)):
+        embs.append(dataset[i])
+    for i in range(0, len(dataset), 128):
+        for r in image_encoder.encode(list(map(dataset.load_image, embs[i:i + 128])),
+                                      batch_size=128, device=device):
+            res.append(r)
+    print(len(res), len(news))
+    news['ImageEmbedding'] = res
+    news.to_feather(path)
+
+
 if __name__ == '__main__':
     # with tqdm(total=2) as tq:
     #     tq.set_description('Processing the train part', refresh=True)
@@ -164,5 +231,6 @@ if __name__ == '__main__':
     #     tq.update()
     #     print(f'train:\n\tunique users {users_len_train}\n\tunique news {news_len_train}')
     #     print(f'validation:\n\tunique users {users_len_val}\n\tunique news {news_len_val}')
-    get_embedding_from_image(5, images_folder=Path('datasets/MIND/Images'))
-    get_embedding_from_text(10)
+    get_clip_embedding_from_image(images_folder=Path('datasets/MIND/Images'), path=Path('datasets/MIND/news_val'
+                                                                                        '.feather'))
+    get_clip_embedding_from_text(10, path=Path('datasets/MIND/news_val.feather'))

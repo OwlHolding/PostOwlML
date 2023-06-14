@@ -43,21 +43,20 @@ class Identity(nn.Module):
 
 
 class MultiModalDataset(Dataset):
-    def __init__(self, news, users, stage, images_rate=0.5):
+    def __init__(self, news, users, length, images_rate=0.5):
         super().__init__()
         self.news = news
         self.news['ImageEmbedding'] = self.news['ImageEmbedding'].apply(lambda x: x.astype(np.float32))
         self.news['TextEmbedding'] = self.news['ImageEmbedding'].apply(lambda x: x.astype(np.float32))
-        self.news.set_index('NewsID', inplace=True)
-        self.max_len = min(max(users['News'].apply(len)), max(users['News_marked'].apply(len)))
-        self.stage = stage if stage < self.max_len else self.max_len
+        self.length = length
 
-        self.users = users[users['News'].apply(len) >= self.stage][users['News_marked'].apply(len) >= self.stage]
+        self.users = users[(users['News'].apply(len) >= length) * (users['News_marked'].apply(len) >= length)]
         self.images_rate = images_rate
 
     def __getitem__(self, idx):
         row = self.users.iloc[idx]
-        return list(map(self.get_embedding, row['News'][:self.stage])), list(map(self.get_embedding, row['News_marked'][:self.stage])), row['Labels'][:self.stage].astype(float)
+        return list(map(self.get_embedding, row['News'][:self.length])),\
+            list(map(self.get_embedding, row['News_marked'][:self.length])), row['Labels'][:self.length].astype(float)
 
     def get_embedding(self, id_):
         if random.random() > self.images_rate:
