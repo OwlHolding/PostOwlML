@@ -21,7 +21,7 @@ async def add_user(user_id: int) -> Response:
     return Response(status_code=status_code)
 
 
-@app.delete("/del-user/{user_id}/")
+@app.post("/del-user/{user_id}/")
 async def del_user(user_id: int) -> Response:
     status_code = (not ml.del_user(user_id)) * 3 + 205
 
@@ -39,7 +39,7 @@ async def add_channel(user_id: int, channel: str) -> Response:
     return Response(status_code=status_code)
 
 
-@app.delete("/del-channel/{user_id}/{channel}/")
+@app.post("/del-channel/{user_id}/{channel}/")
 async def del_channel(user_id: int, channel: str) -> Response:
     status_code = (not ml.del_channel(user_id, channel)) * 3 + 205
 
@@ -53,9 +53,11 @@ async def predict(request: PredictRequest) -> Response:
 
     users = ml.predict(request.post, request.channel, request.users)
 
-    logging.info(f"predict request for channel {request.channel} - 202")
-    logging.debug(f"{request.users} -> {users}")
+    if len(users) == 0:
+        logging.info(f"predict request for channel {request.channel} - 400")
+        return Response(status_code=400)
 
+    logging.info(f"predict request for channel {request.channel} - 202")
     return JSONResponse(
         content={
             "users": users
@@ -64,7 +66,7 @@ async def predict(request: PredictRequest) -> Response:
     )
 
 
-@app.put("/train/{user_id}/{channel}/")
+@app.post("/train/{user_id}/{channel}/")
 async def train(user_id: int, channel: str, request: TrainRequest):
     logging.info(f"{user_id} send label for channel {channel} - 202")
 

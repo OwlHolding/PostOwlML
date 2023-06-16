@@ -17,7 +17,7 @@
 500 Internal Server Error 
 ```
 
-## Del User
+## POST User
 
 ### DELETE <http://$url/del-user/$user-id/>
 
@@ -51,7 +51,7 @@
 500 Internal Server Error 
 ```
 
-## Del Channel
+## POST Channel
 
 ### DELETE <http://$url/add-channel/$user-id/$channel/>
 
@@ -71,7 +71,7 @@
 
 ## Predict
 
-### GET <http://$url/predict/>
+### POST <http://$url/predict/>
 
 Запрос:
 ```json
@@ -94,20 +94,19 @@
 
 ```
 202 Accepted 
+400 No users
 ```
 
 ### Ошибка
 
 ```
 500 Internal Server Error 
-404 User Not Found
-400 Channel Not Found
 422 Unprocessable Entity
 ```
 
 ## Train
 
-### PUT <http://$url/predict/$user-id/$channel/>
+### POST <http://$url/predict/$user-id/$channel/>
 
 Запрос:
 ```json
