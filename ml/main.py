@@ -4,55 +4,78 @@ import pymongo
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 import bson
-from models import ItemEmbeddingModel, UserEmbeddingModel, Decoder, config
+from .models import ItemEmbeddingModel, UserEmbeddingModel, Decoder, config
 import pickle
+import logging
+
+MONGO_URL = 'mongodb://localhost:27017/'
+
 
 def add_user(user_id: int) -> bool:
-    client = pymongo.MongoClient(host='mongodb://localhost:27017/')
-    db = client.postowl
-    coll = db.users
-    coll.insert_one({'_id': user_id, 'channels': [], 'embedding': None})
-    return True
+    try:
+        client = pymongo.MongoClient(host=MONGO_URL)
+        db = client.postowl
+        coll = db.users
+        coll.insert_one({'_id': user_id, 'channels': [], 'embedding': None})
+        return True
+    except Exception as e:
+        return False
 
 
 def del_user(user_id: int) -> bool:
-    client = pymongo.MongoClient(host='mongodb://localhost:27017/')
-    db = client.postowl
-    coll = db.users
-    coll.delete_one({'_id': user_id})
-    return True
+    try:
+        client = pymongo.MongoClient(host=MONGO_URL)
+        db = client.postowl
+        coll = db.users
+
+        coll.delete_one({'_id': user_id})
+        return True
+    except Exception as e:
+        return False
 
 
 def add_channel(user_id: int, channel: str) -> bool:
-    client = pymongo.MongoClient(host='mongodb://localhost:27017/')
-    db = client.postowl
-    coll = db.users
-    channels = coll.find_one({'_id': user_id})['channels']
-    channels.append({'_id': channel})
-    coll.update_one({'_id': user_id},
-                    {'$set': {'channels': channels}
-                     })
-    return True
+    try:
+        client = pymongo.MongoClient(host=MONGO_URL)
+        db = client.postowl
+        coll = db.users
+
+        channels = coll.find_one({'_id': user_id})['channels']
+        channels.append({'_id': channel})
+        coll.update_one({'_id': user_id},
+                        {'$set': {'channels': channels}
+                         })
+        return True
+    except Exception as e:
+        logging.info('ML: User already registered')
+        return False
 
 
 def del_channel(user_id: int, channel: str) -> bool:
-    client = pymongo.MongoClient(host='mongodb://localhost:27017/')
-    db = client.postowl
-    coll = db.users
-    channels = [i for i in coll.find_one({'_id': user_id})['channels'] if i['_id'] != channel]
-    coll.update_one({'_id': user_id},
-                    {'$set': {'channels': channels}
-                     })
-    return True
+    try:
+        client = pymongo.MongoClient(host=MONGO_URL)
+        db = client.postowl
+        coll = db.users
+        channels = [i for i in coll.find_one({'_id': user_id})['channels'] if i['_id'] != channel]
+        coll.update_one({'_id': user_id},
+                        {'$set': {'channels': channels}
+                         })
+        return True
+    except Exception as e:
+        logging.info(e)
+        return False
 
 
 def predict(post: str, channel: str, users: list[int]) -> list[int]:
     with torch.no_grad():
         device = torch.device(config['device'])
-        client = pymongo.MongoClient(host='mongodb://localhost:27017/')
-        db = client.postowl
-        coll = db.users
-
+        try:
+            client = pymongo.MongoClient(host=MONGO_URL)
+            db = client.postowl
+            coll = db.users
+        except Exception as e:
+            logging.error(f'ML: {e}')
+            return users
         text_encoder = SentenceTransformer('sentence-transformers/clip-ViT-B-32-multilingual-v1')
 
         item_embedding_model = ItemEmbeddingModel(
@@ -79,7 +102,11 @@ def predict(post: str, channel: str, users: list[int]) -> list[int]:
         post = text_encoder.encode(post, batch_size=config['batch_size'], device=config['device'], convert_to_tensor=True)
         item_embedding = item_embedding_model(post)
         for user_id in users:
-            user_embedding = coll.find_one({'_id': user_id})['embedding']
+            try:
+                user_embedding = coll.find_one({'_id': user_id})['embedding']
+            except Exception as e:
+                user_embedding = None
+                logging.error(f'ML: {e}')
             if user_embedding is None:
                 predict.append(user_id)
                 continue
@@ -95,10 +122,15 @@ def predict(post: str, channel: str, users: list[int]) -> list[int]:
 def train(user_id: int, channel: str, post: str, label: bool) -> None:
     if label:
         with torch.no_grad():
+            try:
+                client = pymongo.MongoClient(host=MONGO_URL)
+                db = client.postowl
+                coll = db.users
+                user_embedding = coll.find_one({'_id': user_id})['embedding']
+            except Exception as e:
+                logging.error(f"ML: {e}")
+                return
             device = torch.device(config['device'])
-            client = pymongo.MongoClient(host='mongodb://localhost:27017/')
-            db = client.postowl
-            coll = db.users
             text_encoder = SentenceTransformer('sentence-transformers/clip-ViT-B-32-multilingual-v1')
             tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/clip-ViT-B-32-multilingual-v1')
             item_embedding_model = ItemEmbeddingModel(
@@ -121,7 +153,7 @@ def train(user_id: int, channel: str, post: str, label: bool) -> None:
             user_embedding_model.to(device)
             text_encoder.to(device)
 
-            user_embedding = coll.find_one({'_id': user_id})['embedding']
+
             if user_embedding is not None:
                 user_embedding = torch.from_numpy(pickle.loads(user_embedding))
             post = tokenizer(
@@ -138,9 +170,12 @@ def train(user_id: int, channel: str, post: str, label: bool) -> None:
             item_embedding = item_embedding_model(post).unsqueeze(0)
 
             user_embedding = user_embedding_model(item_embedding, user_embedding)[-1, :]
-            coll.update_one({'_id': user_id},
-                            {'$set': {'embedding': bson.Binary(pickle.dumps(user_embedding.cpu().numpy(), protocol=2))}
-                             })
+            try:
+                coll.update_one({'_id': user_id},
+                                {'$set': {'embedding': bson.Binary(pickle.dumps(user_embedding.cpu().numpy(), protocol=2))}
+                                 })
+            except Exception as e:
+                logging.error(f"ML: {e}")
     return
 
 
