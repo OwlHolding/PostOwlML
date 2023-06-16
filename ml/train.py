@@ -11,7 +11,7 @@ from torch import optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from models import ItemEmbeddingModel, UserEmbeddingModel, Decoder
+from models import ItemEmbeddingModel, UserEmbeddingModel, Decoder, config
 from utils import MultiModalDataset, seed_everything
 
 warnings.simplefilter('ignore')
@@ -19,12 +19,12 @@ warnings.simplefilter('ignore')
 
 def validation(user_embedding_model, item_embedding_model, criterion, device,
                val_loader, decoder_model, log_wandb=False):
-    predict_f1 = []
-    predict_auc = []
+    f1_pred = []
+    roc_auc_pred = []
     val_loss = []
 
-    target_f1 = []
-    target_auc = []
+    f1_true = []
+    roc_auc_true = []
     item_embedding_model.eval()
     user_embedding_model.eval()
     with torch.no_grad():
@@ -40,30 +40,32 @@ def validation(user_embedding_model, item_embedding_model, criterion, device,
 
                 i_embeddings = item_embedding_model(news_i).permute(1, 0, 2)
 
-                output = decoder_model(u_embedding, i_embeddings).float()
+                output = torch.cat(decoder_model(u_embedding, i_embeddings).float(), dim=0)
 
                 labels = torch.flatten(labels).float().to(device)
 
                 loss = criterion(output, labels)
                 val_loss.append(loss.item())
-                predict_auc.append(output.detach().cpu().numpy())
-                target_auc.append(labels.detach().cpu().numpy())
+                roc_auc_pred.append(output.detach().cpu().numpy())
+                roc_auc_true.append(labels.detach().cpu().numpy())
 
-                predict_f1.append(np.around(output.detach().cpu().numpy()))
-                target_f1.append(np.around(labels.detach().cpu().numpy()))
+                f1_pred.append(output.detach().cpu().numpy())
+                f1_true.append(labels.detach().cpu().numpy())
 
                 progress_bar.set_description(f'Loss: {np.mean(val_loss)}')
                 progress_bar.update()
         if log_wandb:
             wandb.log({
-                'Validation F1': f1_score(y_true=np.concatenate(target_f1), y_pred=np.concatenate(predict_f1)),
-                'Validation Roc Auc': roc_auc_score(y_true=np.concatenate(target_auc), y_score=np.concatenate(predict_auc)),
+                'Validation F1': f1_score(y_true=np.around(np.concatenate(f1_true)), y_pred=np.around(np.concatenate(f1_pred))),
+                'Validation Roc Auc': roc_auc_score(y_true=np.concatenate(roc_auc_true),
+                                                    y_score=np.concatenate(roc_auc_pred)),
                 'Validation Loss': np.mean(val_loss)
             })
 
 
-def train(user_embedding_model, item_embedding_model, criterion, optimizer, device, config,
-          decoder_model, news, users, val_news, val_users, checkpoint_dir, batch_size, images_rate=0.5, log_wandb=False, epochs=100,
+def train(user_embedding_model, item_embedding_model, criterion, optimizer, device, config_zesrec,
+          decoder_model, news, users, val_news, val_users, checkpoint_dir, batch_size, images_rate=0.5, log_wandb=False,
+          epochs=100,
           seed=42):
     seed_everything(seed)
     ue_model.to(device)
@@ -72,13 +74,11 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
     criterion.to(device)
     if log_wandb:
         wandb.login(key='5bcd93f54a66c38eeb79903c0ac633d5d3c3fab5')
-        wandb.init(project='ZESRec', config=config)
+        wandb.init(project='ZESRec', config=config_zesrec)
     length = 101
     for epoch in range(epochs):
-        print(f'Epoch {epoch}')
+        print(f'Epoch {epoch}, Length {length}')
         mean_loss = []
-        mean_roc_auc = []
-        mean_f1 = []
         dataset = MultiModalDataset(
             news=news,
             users=users,
@@ -95,6 +95,10 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
         user_embedding_model.train()
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+        roc_auc_pred = []
+        roc_auc_true = []
+        f1_pred = []
+        f1_true = []
         with tqdm(total=len(loader)) as progress_bar:
             for batch in loader:
                 news_u, news_i, labels = batch
@@ -103,11 +107,11 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
 
                 i_embeddings = item_embedding_model(news_u).permute(1, 0, 2)
 
-                u_embedding = user_embedding_model(i_embeddings)
+                u_embedding = user_embedding_model(i_embeddings)[-1, :, :]
 
                 i_embeddings = item_embedding_model(news_i).permute(1, 0, 2)
 
-                output = decoder_model(u_embedding, i_embeddings)
+                output = torch.cat(decoder_model(u_embedding, i_embeddings), dim=0)
 
                 labels = torch.flatten(labels).to(device)
 
@@ -116,22 +120,15 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
                 optimizer.step()
                 optimizer.zero_grad()
                 mean_loss.append(loss.item())
+                roc_auc_pred.append(output.detach().cpu().numpy())
+                roc_auc_true.append(labels.detach().cpu().numpy())
+                f1_pred.append(output.detach().cpu().numpy())
+                f1_true.append(labels.detach().cpu().numpy())
 
-                roc_auc = roc_auc_score(
-                    y_true=labels.detach().cpu().numpy(),
-                    y_score=output.detach().cpu().numpy(),
-                )
-                f1 = f1_score(
-                    y_true=np.around(labels.detach().cpu().numpy()),
-                    y_pred=np.around(output.detach().cpu().numpy()),
-                )
-                mean_f1.append(f1)
-                mean_roc_auc.append(roc_auc)
                 if log_wandb:
-                    wandb.log({'Loss': loss.item(), 'Roc Auc': roc_auc, 'Mean Roc Auc': np.mean(mean_roc_auc),
-                               'Mean Loss': np.mean(mean_loss), 'F1': f1, 'Mean F1': np.mean(mean_f1)})
+                    wandb.log({'Loss': loss.item(), 'Mean Loss': np.mean(mean_loss)})
                 progress_bar.set_description(
-                    f'Loss: {np.mean(mean_loss)},  Roc Auc: {np.mean(mean_roc_auc)}')
+                    f'Loss: {np.mean(mean_loss)}')
                 progress_bar.update()
 
             torch.save(user_embedding_model.state_dict(), checkpoint_dir / f'ue_model_{epoch}.pt')
@@ -139,22 +136,17 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
             progress_bar.set_description('Models saved', refresh=True)
             validation(user_embedding_model, item_embedding_model, nn.BCELoss(), device,
                        val_loader, decoder_model, log_wandb=log_wandb)
-        length -= 1
+            if log_wandb:
+                wandb.log({
+                    'Train F1': f1_score(y_true=np.around(np.concatenate(f1_true)),
+                                         y_pred=np.around(np.concatenate(f1_pred))),
+                    'Train Roc Auc': roc_auc_score(y_true=np.concatenate(roc_auc_true),
+                                                   y_score=np.concatenate(roc_auc_pred))
+                })
+            length -= 1
 
 
 if __name__ == '__main__':
-    config = {
-        'device': 'cuda' if torch.cuda.is_available() else 'cpu',
-        'embedding_size': 256,
-        'dropout_rate': 0.2,
-        'encoder_size': 512,
-        'gru_num_layers': 2,
-        'images_rate': 0.5,
-        'lr': 0.00001,
-        'epochs': 100,
-        'batch_size': 128,
-        'log_wandb': True,
-    }
 
     ie_model = ItemEmbeddingModel(
         embedding_size=config['embedding_size'],
@@ -189,7 +181,7 @@ if __name__ == '__main__':
         log_wandb=config['log_wandb'],
         batch_size=config['batch_size'],
         checkpoint_dir=Path('checkpoints') / 'from_max',
-        config=config,
+        config_zesrec=config,
         val_news=mind_val,
         val_users=pd.read_feather(r'datasets/MIND/users_val.feather'),
     )

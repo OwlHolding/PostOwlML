@@ -11,4 +11,4 @@ class Decoder(nn.Module):
         res = []
         for u_e, i_e in zip(user_embedding, item_embedding):
             res.append(F.softmax(torch.matmul(u_e, i_e.T), dim=-1))
-        return torch.cat(res, dim=0)
+        return res

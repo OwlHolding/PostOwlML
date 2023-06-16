@@ -23,4 +23,4 @@ class UserEmbeddingModel(nn.Module):
         else:
             output, user_embedding = self.gru(item_embeddings, user_embedding)
 
-        return user_embedding[-1, :, :]
+        return user_embedding
