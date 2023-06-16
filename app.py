@@ -53,9 +53,11 @@ async def predict(request: PredictRequest) -> Response:
 
     users = ml.predict(request.post, request.channel, request.users)
 
-    logging.info(f"predict request for channel {request.channel} - 202")
-    logging.debug(f"{request.users} -> {users}")
+    if len(users) == 0:
+        logging.info(f"predict request for channel {request.channel} - 400")
+        return Response(status_code=400)
 
+    logging.info(f"predict request for channel {request.channel} - 202")
     return JSONResponse(
         content={
             "users": users
