@@ -1,0 +1,7 @@
+{
+  "ENDPOINT": "https://ru-msk-dr3-1.store.cloud.mts.ru",
+  "S3_BUCKET": "hub-objectuser-3649673003",
+  "SERVICE_NAME": "s3",
+  "KEY": "admin-3649673003",
+  "SECRET": "2ee4e400-94Bb-4218-b011-0586d6b17840"
+}

@@ -3,7 +3,7 @@ from .ue_model import UserEmbeddingModel
 from .decoder_model import Decoder
 import torch
 
-config = {
+config_ml = {
         'device': 'cuda' if torch.cuda.is_available() else 'cpu',
         'embedding_size': 256,
         'dropout_rate': 0.2,

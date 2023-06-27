@@ -1,6 +1,7 @@
 import warnings
 from pathlib import Path
 
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -11,7 +12,7 @@ from torch import optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from models import ItemEmbeddingModel, UserEmbeddingModel, Decoder, config
+from models import ItemEmbeddingModel, UserEmbeddingModel, Decoder, config_ml
 from utils import MultiModalDataset, seed_everything
 
 warnings.simplefilter('ignore')
@@ -36,15 +37,16 @@ def validation(user_embedding_model, item_embedding_model, criterion, device,
 
                 i_embeddings = item_embedding_model(news_u).permute(1, 0, 2)
 
-                u_embedding = user_embedding_model(i_embeddings)
+                u_embedding = user_embedding_model(i_embeddings)[-1, :, :]
 
                 i_embeddings = item_embedding_model(news_i).permute(1, 0, 2)
 
-                output = torch.cat(decoder_model(u_embedding, i_embeddings).float(), dim=0)
+                output = torch.cat(decoder_model(u_embedding, i_embeddings))
+
 
                 labels = torch.flatten(labels).float().to(device)
 
-                loss = criterion(output, labels)
+                loss = criterion(output, labels.long())
                 val_loss.append(loss.item())
                 roc_auc_pred.append(output.detach().cpu().numpy())
                 roc_auc_true.append(labels.detach().cpu().numpy())
@@ -115,7 +117,7 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
 
                 labels = torch.flatten(labels).to(device)
 
-                loss = criterion(output.float(), labels.float())
+                loss = criterion(output.float(), labels.long())
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -134,7 +136,7 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
             torch.save(user_embedding_model.state_dict(), checkpoint_dir / f'ue_model_{epoch}.pt')
             torch.save(item_embedding_model.state_dict(), checkpoint_dir / f'ie_model_{epoch}.pt')
             progress_bar.set_description('Models saved', refresh=True)
-            validation(user_embedding_model, item_embedding_model, nn.BCELoss(), device,
+            validation(user_embedding_model, item_embedding_model, criterion, device,
                        val_loader, decoder_model, log_wandb=log_wandb)
             if log_wandb:
                 wandb.log({
@@ -143,23 +145,24 @@ def train(user_embedding_model, item_embedding_model, criterion, optimizer, devi
                     'Train Roc Auc': roc_auc_score(y_true=np.concatenate(roc_auc_true),
                                                    y_score=np.concatenate(roc_auc_pred))
                 })
+
             length -= 1
 
 
 if __name__ == '__main__':
-
+    os.environ['WANDB_MODE'] = 'online'
     ie_model = ItemEmbeddingModel(
-        embedding_size=config['embedding_size'],
-        encoder_size=config['encoder_size'],
+        embedding_size=config_ml['embedding_size'],
+        encoder_size=config_ml['encoder_size'],
         intermediate_sizes=[512, 256],
-        dropout_rate=config['dropout_rate'],
+        dropout_rate=config_ml['dropout_rate'],
     )
 
     ue_model = UserEmbeddingModel(
-        gru_input_size=config['embedding_size'],
-        gru_hidden_size=config['embedding_size'],
-        gru_num_layers=config['gru_num_layers'],
-        dropout=config['dropout_rate'],
+        gru_input_size=config_ml['embedding_size'],
+        gru_hidden_size=config_ml['embedding_size'],
+        gru_num_layers=config_ml['gru_num_layers'],
+        dropout=config_ml['dropout_rate'],
     )
 
     decoder = Decoder()
@@ -173,15 +176,15 @@ if __name__ == '__main__':
         users=pd.read_feather(r'datasets/MIND/users_train.feather'),
         user_embedding_model=ue_model,
         item_embedding_model=ie_model,
-        criterion=nn.BCELoss(),
-        optimizer=optim.AdamW(list(ue_model.parameters()) + list(ie_model.parameters()), lr=config['lr']),
-        device=torch.device(config['device']),
+        criterion=nn.NLLLoss(),
+        optimizer=optim.AdamW(list(ue_model.parameters()) + list(ie_model.parameters()), lr=config_ml['lr']),
+        device=torch.device(config_ml['device']),
         decoder_model=decoder,
-        epochs=config['epochs'],
-        log_wandb=config['log_wandb'],
-        batch_size=config['batch_size'],
-        checkpoint_dir=Path('checkpoints') / 'from_max',
-        config_zesrec=config,
+        epochs=config_ml['epochs'],
+        log_wandb=config_ml['log_wandb'],
+        batch_size=config_ml['batch_size'],
+        checkpoint_dir=Path('checkpoints') / '3',
+        config_zesrec=config_ml,
         val_news=mind_val,
         val_users=pd.read_feather(r'datasets/MIND/users_val.feather'),
     )
