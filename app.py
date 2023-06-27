@@ -9,7 +9,7 @@ from schemes import *
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s - %(message)s", filename="log.txt",
                     filemode="w")
 
-app = FastAPI()
+app = FastAPI(docs_url=None)
 
 
 @app.post("/add-user/{user_id}/")
