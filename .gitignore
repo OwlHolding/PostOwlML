@@ -132,8 +132,17 @@ dmypy.json
 .idea/
 .idea/*
 
-users
-users/*
+
 catboost_info
 catboost_info/*
 log.txt
+
+ml/wandb
+ml/wandb/*
+
+ml/checkpoints/*
+
+ml/datasets/MIND
+ml/datasets/MIND/*
+
+config.json

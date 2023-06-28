@@ -1,130 +1,54 @@
-import json
-import time
-import shutil
-
 from starlette.testclient import TestClient
-
-import core.telegram as telegram
 from app import app
-from files import save_config, load_config, load_dataset, save_dataset
+from ml import train, predict
 
 client = TestClient(app)
-posts = dict()
-markup = dict()
-channels = ['forbesrussia',
-            'postupashki',
-            'airi_research_institute',
-            'mintsifry',
-            'bloomberg_ru',
-            'RussianHackers_Channel',
-            'BDataScienceM',
-            'gradientdip',
-            'yandex',
-            'nn_for_science']
 
 
-def test_telegram_channels():
-    for channel in channels:
-        assert telegram.get_posts(channel, 10, 0)[1] == 200
-
-
-def test_telegram_count():
-    assert telegram.get_posts(channels[0], 100, 0)[1] == 200
-    assert telegram.get_posts(channels[0], 500, 0)[1] == 200
-
-
-def test_ping():
-    response = client.post('/register/1')
+def test_add_user():
+    response = client.post("/add-user/1/")
     assert response.status_code // 10 == 20
 
 
-def test_register_channel():
-    for channel in channels:
-        response = client.post(f'/regchannel/1/{channel}')
-        assert response.status_code // 10 == 20
-        posts[channel] = response.json()
+def test_del_user():
+    response = client.post("/del-user/1/")
+    assert response.status_code // 10 == 20
 
 
-def test_wrong_channel():
-    response = client.post('/regchannel/1/dhfhsdhfkhkffsdsdsdjk')
-    assert response.status_code == 400
+def test_add_channel():
+    response = client.post("/add-channel/1/forbesrussia")
+    assert response.status_code // 10 == 20
 
 
-def test_wrong_user():
-    response = client.post(f'/regchannel/2/{channels[0]}')
-    assert response.status_code == 404
+def test_del_channel():
+    response = client.post("/del-channel/1/forbesrussia")
+    assert response.status_code // 10 == 20
 
 
 def test_train():
-    for channel in channels:
-        data = json.dumps({
-            'posts': posts[channel]['posts'],
-            'labels': [i % 2 for i in range(len(posts[channel]['posts']))],
-            'finetune': False
-        })
-        response = client.post(f'/train/1/{channel}', data=data)
-        assert response.status_code // 10 == 20
+    train(1, 'forbes', post='''Forbes USA изучил деятельность Stability AI, компании с оборотом $1 млрд, и ее основателя
+         Эмада Мостака. 
+    Обладатель степени магистра Оксфордского университета, Мостак — титулованный менеджер хедж-фондов, доверенное лицо
+     Организации Объединенных Наций и создатель технологии Stable Diffusion.
+    Сегодня бизнесмена можно назвать одной из главных фигур волны генеративного ИИ.
+     Кроме того, своей компании он обеспечил свыше $100 млн на реализацию собственного представления о том,
+      каким нужно строить по-настоящему открытый ИИ. «Надеюсь, за такое мне положена Нобелевская премия», - шутил он в
+       январском интервью для Forbes.
+    По крайней мере, все это рассказывает он сам.
+    На самом же деле в Оксфорде Мостак получил степень бакалавра, а не магистра. Это не единственная ложь, которую
+     рассказывает Мостак, чтобы пробиться в авангард движения.
+    Редакция провела интервью с 13 бывшими и нынешними сотрудниками компании и более чем двумя десятками инвесторов, а также
+     проанализировала презентации и внутренние документы.
+    Как показало расследование, успех стартапа во многом обеспечили приписывание себе чужих успехов и откровенная ложь его 
+    гендиректора. 
+    Как основатель Stability AI добился успеха благодаря лжи - читайте на сайте Forbes (https://www.forbes.ru/investicii/490
+    540-mnogoe-ne-shoditsa-kak-osnovatel-stability-ai-dobilsa-uspeha-blagodara-lzi)''', label=True)
 
 
 def test_predict():
-    for channel in channels:
-        response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
-        markup[channel] = [response.json()['markup']]
-        assert response.status_code // 10 == 20
-        assert isinstance(response.json()['markup'], str)
-        assert isinstance(response.json()['posts'], list)
-
-
-def get_finetune_data(channel):
-    return json.dumps({
-        'posts': markup[channel],
-        'labels': [i % 2 for i in range(len(markup[channel]))],
-        'finetune': True
-    })
-
-
-def test_owl_learning_step():
-    for channel in channels:
-        for _ in range(6):
-            response = client.post(f'/train/1/{channel}', data=get_finetune_data(channel))
-            assert response.status_code // 10 == 20
-            response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
-            assert response.status_code // 10 == 20
-            markup[channel] = [response.json()['markup']]
-
-
-def test_owl_learning_step_cb():
-    for channel in channels:
-        config = load_config(1, channel)
-        config['model'] = 'CatBoost'
-        save_config(1, channel, config)
-
-        dataset = load_dataset(1, channel)
-        j = 0
-        for i in dataset[dataset['labels'].isna()].index:
-            if (dataset['labels'].notna().sum() - 10) % 6 == 0:
-                break
-            j += 1
-            dataset.at[i, 'labels'] = j % 2
-        save_dataset(user_id=1, channel=channel, dataset=dataset)
-        data = {
-            'posts': posts[channel]['posts'][:8],
-            'labels': [i % 2 for i in range(len(posts[channel]['posts']))][:8],
-            'finetune': True
-        }
-        response = client.post(f'/train/1/{channel}', data=json.dumps(data))
-        assert response.status_code // 10 == 20
-
-
-def test_predict_cb():
-    for channel in channels:
-        response = client.post(f'/predict/1/{channel}', data=json.dumps({'time': 0}))
-        assert response.status_code // 10 == 20
-        assert isinstance(response.json()['markup'], str)
-        assert isinstance(response.json()['posts'], list)
-
-
-def test_remove_dir():
-    time.sleep(5)
-    shutil.rmtree('users/1')
-    assert True
+    assert len(predict(post='''Из-за разрушения Каховской ГЭС погибли 
+        (https://www.forbes.ru/society/491068-glava-hersonskoj-oblasti-nazval-cislo-pogibsih-iz-za-razrusenia-kahovskoj-ges?
+        utm_source=forbes&utm_campaign=lnews)
+         25 человек, еще 17 человек числятся пропавшими без вести, заявил врио губернатора Херсонской области Владимир
+          Сальдо. С территорий ниже ГЭС по течению
+          Днепра эвакуированы около 8000 человек''', users=[1, 2], channel='forbes')) == 2
