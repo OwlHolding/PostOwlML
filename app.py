@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request
 from fastapi.responses import JSONResponse
 
 import logging
+import json
 
 import ml
 from schemes import *
@@ -11,9 +12,30 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(asctime)s -
 
 app = FastAPI(docs_url=None)
 
+with open("config.json", 'rb') as file:
+    config = json.load(file)
+
+WHITELIST = config['WHITELIST']
+
+
+def firewall(request):
+    if len(WHITELIST) == 0:
+        return True
+    ip = request.client.host
+    print(ip)
+    if ip is None:
+        return True
+    if ip in WHITELIST:
+        return True
+
+    return False
+
 
 @app.post("/add-user/{user_id}/")
-async def add_user(user_id: int) -> Response:
+async def add_user(user_id: int, request: Request) -> Response:
+    if not firewall(request):
+        return Response(status_code=403)
+
     status_code = (not ml.add_user(user_id)) * 7 + 201
 
     logging.info(f"{user_id} add user - {status_code}")
@@ -22,7 +44,10 @@ async def add_user(user_id: int) -> Response:
 
 
 @app.post("/del-user/{user_id}/")
-async def del_user(user_id: int) -> Response:
+async def del_user(user_id: int, request: Request) -> Response:
+    if not firewall(request):
+        return Response(status_code=403)
+
     status_code = (not ml.del_user(user_id)) * 3 + 205
 
     logging.info(f"{user_id} del user - {status_code}")
@@ -31,7 +56,10 @@ async def del_user(user_id: int) -> Response:
 
 
 @app.post("/add-channel/{user_id}/{channel}/")
-async def add_channel(user_id: int, channel: str) -> Response:
+async def add_channel(user_id: int, channel: str, request: Request) -> Response:
+    if not firewall(request):
+        return Response(status_code=403)
+
     status_code = (not ml.add_channel(user_id, channel)) * 7 + 201
 
     logging.info(f"{user_id} add channel {channel} - {status_code}")
@@ -40,7 +68,10 @@ async def add_channel(user_id: int, channel: str) -> Response:
 
 
 @app.post("/del-channel/{user_id}/{channel}/")
-async def del_channel(user_id: int, channel: str) -> Response:
+async def del_channel(user_id: int, channel: str, request: Request) -> Response:
+    if not firewall(request):
+        return Response(status_code=403)
+
     status_code = (not ml.del_channel(user_id, channel)) * 3 + 205
 
     logging.info(f"{user_id} del channel {channel} - {status_code}")
@@ -49,7 +80,9 @@ async def del_channel(user_id: int, channel: str) -> Response:
 
 
 @app.post("/predict/")
-async def predict(request: PredictRequest) -> Response:
+async def predict(request: PredictRequest, row_request: Request) -> Response:
+    if not firewall(row_request):
+        return Response(status_code=403)
 
     users = ml.predict(request.post, request.channel, request.users)
 
@@ -67,7 +100,10 @@ async def predict(request: PredictRequest) -> Response:
 
 
 @app.post("/train/{user_id}/{channel}/")
-async def train(user_id: int, channel: str, request: TrainRequest):
+async def train(user_id: int, channel: str, request: TrainRequest, row_request: Request):
+    if not firewall(row_request):
+        return Response(status_code=403)
+
     logging.info(f"{user_id} send label for channel {channel} - 202")
 
     ml.train(user_id, channel, request.text, request.label)

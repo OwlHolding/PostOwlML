@@ -144,3 +144,5 @@ ml/checkpoints/*
 
 ml/datasets/MIND
 ml/datasets/MIND/*
+
+config.json
