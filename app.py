@@ -22,7 +22,6 @@ def firewall(request):
     if len(WHITELIST) == 0:
         return True
     ip = request.client.host
-    print(ip)
     if ip is None:
         return True
     if ip in WHITELIST:
