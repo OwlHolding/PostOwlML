@@ -11,7 +11,7 @@
 pip3 install -r requirements.txt
 ```
 
-Если хотите выполнить тесты запустите:
+Если хотите выполнить тесты, запустите:
 ```shell
 pytest test.py
 ```
@@ -23,4 +23,4 @@ pytest test.py
 uvicorn app:app --host <your_host_name> --port <your_port> --ssl-keyfile <path to SSL key file> --ssl-certfile <path to SSL certificate file>
 ```
 
-Все готово, сервер успешно запущен. Для получения подробной информации о структуре и адресе запросов, смотрите файл `Architecture.md`
+Все готово, сервер успешно запущен. Для получения подробной информации о структуре и адресе запросов смотрите файл `Architecture.md`
