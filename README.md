@@ -20,7 +20,7 @@ pytest test.py
 
 Для поднятия сервера выполните:
 ```shell
-uvicorn app:app --host your_host_name --port your_port
+uvicorn app:app --host your_host_name --port your_port --ssl-keyfile <path to SSL key file> --ssl-certfile <path to SSL certificate file>
 ```
 
 Все готово, сервер успешно запущен. Для получения подробной информации о структуре и адресе запросов, смотрите файл `Architecture.md`
