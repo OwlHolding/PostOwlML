@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import torch
+from PIL import Image
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 from .database import S3Database
@@ -127,4 +128,85 @@ def train(user_id: int, channel: str, post: str, label: bool) -> None:
     return
 
 
+def train_image(user_id: int, channel: str, post: Image, label: bool) -> None:
+    """Работает так же как и train, но аргумент post принимает вместо текста изображение"""
+    if label:
+        with torch.no_grad():
+            user_embedding = DB.get_emb(user_id)
+            device = torch.device(config_ml['device'])
+            image_encoder = SentenceTransformer('clip-ViT-B-32')
+            item_embedding_model = ItemEmbeddingModel(
+                embedding_size=config_ml['embedding_size'],
+                encoder_size=config_ml['encoder_size'],
+                intermediate_sizes=[512, 256],
+                dropout_rate=config_ml['dropout_rate'],
+            )
+            user_embedding_model = UserEmbeddingModel(
+                gru_input_size=config_ml['embedding_size'],
+                gru_hidden_size=config_ml['embedding_size'],
+                gru_num_layers=config_ml['gru_num_layers'],
+                dropout=config_ml['dropout_rate'],
+            )
 
+            user_embedding_model.load_state_dict(torch.load(Path(__file__).resolve().parents[0]/'ue_model.pt'))
+            item_embedding_model.load_state_dict(torch.load(Path(__file__).resolve().parents[0]/'ie_model.pt'))
+            item_embedding_model.eval()
+            user_embedding_model.eval()
+            item_embedding_model.to(device)
+            user_embedding_model.to(device)
+            image_encoder.to(device)
+
+            if user_embedding is not None:
+                user_embedding = torch.from_numpy(pickle.loads(user_embedding))
+            post = image_encoder.encode(post, convert_to_tensor=True)
+            item_embedding = item_embedding_model(post).unsqueeze(0)
+
+            user_embedding = user_embedding_model(item_embedding, user_embedding)[-1, :]
+            DB.update_emb(user_id, user_embedding)
+
+    return
+
+
+def predict_image(post: Image, channel: str, users: list[int]) -> list[int]:
+    """Работает так же как и predict, но аргумент post принимает вместо текста изображение"""
+    with torch.no_grad():
+        device = torch.device(config_ml['device'])
+        image_encoder = SentenceTransformer('clip-ViT-B-32')
+
+        item_embedding_model = ItemEmbeddingModel(
+            embedding_size=config_ml['embedding_size'],
+            encoder_size=config_ml['encoder_size'],
+            intermediate_sizes=[512, 256],
+            dropout_rate=config_ml['dropout_rate'],
+        )
+
+        user_embedding_model = UserEmbeddingModel(
+            gru_input_size=config_ml['embedding_size'],
+            gru_hidden_size=config_ml['embedding_size'],
+            gru_num_layers=config_ml['gru_num_layers'],
+            dropout=config_ml['dropout_rate'],
+        )
+
+        decoder = Decoder()
+        item_embedding_model.load_state_dict(torch.load(Path(__file__).resolve().parents[0]/'ie_model.pt'))
+
+        user_embedding_model.load_state_dict(torch.load(Path(__file__).resolve().parents[0]/'ue_model.pt'))
+        user_embedding_model.eval()
+        item_embedding_model.eval()
+        item_embedding_model.to(device)
+        user_embedding_model.to(device)
+
+        pred = []
+        post = image_encoder.encode(post, convert_to_tensor=True)
+        item_embedding = item_embedding_model(post)
+        for user_id in users:
+            user_embedding = DB.get_emb(user_id)
+            if user_embedding is None:
+                pred.append(user_id)
+                continue
+            user_embedding = torch.from_numpy(pickle.loads(user_embedding)).to(device)
+            o = decoder([item_embedding], [user_embedding])[0].cpu().numpy()
+            if o > 0.5:
+                pred.append(o)
+
+    return pred
