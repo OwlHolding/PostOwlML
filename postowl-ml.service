@@ -13,7 +13,7 @@ Group=www-data
 
 WorkingDirectory=/home/data/PostOwlML
 
-ExecStart=/home/data/PostOwlML/venv/bin/python -m uvicorn app:app --port 8000
+ExecStart=sudo /home/data/PostOwlML/venv/bin/python -m uvicorn app:app --port 8000
 
 
 [Install]
