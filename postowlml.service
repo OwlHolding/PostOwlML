@@ -1,0 +1,21 @@
+[Unit]
+
+Description=Gunicorn Daemon for FastAPI
+
+After=network.target
+
+
+[Service]
+
+User=data
+
+Group=www-data
+
+WorkingDirectory=/home/data/PostOwlML
+
+ExecStart=/home/data/PostOwlML/env/bin/gunicorn -c gunicorn_conf.py app:app
+
+
+[Install]
+
+WantedBy=multi-user.target
