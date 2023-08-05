@@ -22,4 +22,3 @@ sentence-transformers~=2.2.2
 pymongo~=4.3.3
 boto3~=1.26.160
 pytest~=7.4.0
-gunicorn~=21.2.0
